@@ -1,0 +1,111 @@
+:root {
+    --bg: #0a0f0f;
+    --panel: #111a1a;
+    --border: #2a3a3a;
+    --text: #c0d0d0;
+    --accent: #d4a574;
+    --danger: #a04040;
+    --profit: #6aaa6a;
+    --loss: #c06060;
+    --warn: #d4a574;
+    --highlight: #4a6a8a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Courier New', monospace;
+    background: var(--bg);
+    color: var(--text);
+    padding: 10px;
+    min-height: 100vh;
+    user-select: none;
+    -webkit-user-select: none;
+}
+h1 { color: var(--accent); font-size: 1.3em; text-align: center; margin-bottom: 10px; letter-spacing: 2px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.tab {
+    padding: 8px 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.8em;
+    color: #888;
+    flex: 0 0 auto;
+}
+.tab.active { background: var(--border); color: var(--accent); border-bottom: none; }
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 0 8px 8px 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    display: none;
+}
+.panel.active { display: block; }
+h2 { font-size: 1em; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+.row > * { flex: 1 1 80px; }
+button {
+    background: var(--border);
+    color: var(--text);
+    border: 1px solid var(--accent);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+    font-weight: bold;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+button.accent { background: var(--accent); color: #000; border: 1px solid var(--accent); }
+button.danger { border-color: var(--danger); color: var(--danger); }
+select, input, textarea {
+    background: #0a0f0f;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.85em;
+    width: 100%;
+}
+textarea { resize: vertical; min-height: 60px; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.8em; }
+th, td { border: 1px solid var(--border); padding: 6px 4px; text-align: center; }
+th { background: #1a2a2a; color: var(--accent); }
+.delete-btn { background: transparent; border: none; color: var(--danger); cursor: pointer; padding: 2px 6px; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; font-size: 0.85em; }
+.stat-item { background: #0a0f0f; padding: 8px; border-radius: 4px; text-align: center; }
+.stat-item .value { font-size: 1.2em; color: var(--accent); }
+.stat-item .label { font-size: 0.7em; color: #888; }
+.prediction {
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-weight: bold;
+    text-align: center;
+    white-space: pre-line;
+}
+.prediction.up { background: #1a2a1a; color: var(--profit); }
+.prediction.down { background: #2a1a1a; color: var(--loss); }
+.prediction.stable { background: #1a1a2a; color: #aaa; }
+.graph-bar { height: 60px; display: flex; align-items: flex-end; gap: 2px; margin: 8px 0; }
+.graph-bar .bar { flex: 1; background: var(--accent); min-height: 2px; border-radius: 2px 2px 0 0; position: relative; }
+.graph-bar .bar.sell { background: var(--profit); opacity: 0.6; }
+.item-list-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.item-list-item:hover { background: #1a2a2a; }
+.insight-box { background: #0d1111; border-left: 3px solid var(--accent); padding: 8px; margin: 8px 0; font-size: 0.8em; }
+.tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.65em; margin: 2px; font-weight: bold; }
+.tag-factory { background: #4a3a1a; color: #d4a574; }
+.tag-rating { background: #3a1a3a; color: #c084fc; }
+.tag-battlepass { background: #1a3a4a; color: #4fc3f7; }
+.tag-road { background: #3a2a1a; color: #ff9800; }
+.tag-raven { background: #2a1a2a; color: #ce93d8; }
+.tag-workshop { background: #1a3a2a; color: #81c784; }
+.tag-bounty { background: #3a3a1a; color: #fff176; }
+.tag-nerf { background: #3a1a1a; color: #e94560; }
+.tag-buff { background: #1a3a1a; color: #6aaa6a; }
+.tag-bearings { background: #1a2a3a; color: #90caf9; }
+.tag-gift { background: #2a2a1a; color: #ffcc80; }
