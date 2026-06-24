@@ -30,7 +30,7 @@
         <div class="row">
             <input type="text" id="newItemName" placeholder="Название предмета">
             <input type="text" id="newItemType" placeholder="Тип (ресурс/оружие/кабина/колёса/модуль)">
-            <button class="accent" onclick="addItem()">ДОБАВИТЬ</button>
+            <button class="accent" onclick="addItemForm()">ДОБАВИТЬ</button>
         </div>
         <div id="itemsList"></div>
 
@@ -66,8 +66,8 @@
                 </select>
             </div>
             <div class="row">
-                <button class="accent" onclick="addPriceEntry()">ЗАПИСАТЬ ЦЕНУ</button>
-                <button class="danger" onclick="deleteSelectedItem()">УДАЛИТЬ ПРЕДМЕТ</button>
+                <button class="accent" onclick="submitPriceEntry()">ЗАПИСАТЬ ЦЕНУ</button>
+                <button class="danger" onclick="deleteSelectedItem(); renderItems(); document.getElementById('priceEntry').style.display='none';">УДАЛИТЬ ПРЕДМЕТ</button>
             </div>
             <div id="itemAnalytics"></div>
         </div>
@@ -80,7 +80,7 @@
             <select id="tradeItemSelect"></select>
             <input type="number" id="tradeBuyPrice" placeholder="Цена покупки" step="0.01">
             <input type="number" id="tradeSellPrice" placeholder="Цена продажи" step="0.01">
-            <button class="accent" onclick="addTrade()">ЗАПИСАТЬ СДЕЛКУ</button>
+            <button class="accent" onclick="submitTrade()">ЗАПИСАТЬ СДЕЛКУ</button>
         </div>
         <table id="tradesTable">
             <thead><tr><th>Предмет</th><th>Куплен</th><th>Продан</th><th>Прибыль</th><th>%</th><th>Уверенность</th><th></th></tr></thead>
@@ -119,7 +119,7 @@
                 </optgroup>
             </select>
             <input type="text" id="eventDesc" placeholder="Описание">
-            <button class="accent" onclick="addEvent()">➕</button>
+            <button class="accent" onclick="submitEvent()">➕</button>
         </div>
         <div class="calendar" id="calendarWidget"></div>
         <div id="eventsList" style="margin-top:10px;"></div>
@@ -132,7 +132,7 @@
             <select id="insightItemSelect"></select>
         </div>
         <textarea id="insightText" placeholder="Опиши закономерность. Например: После конца рейтинга руда дешевеет на 15% за 2 дня, потом восстанавливается."></textarea>
-        <button class="accent" onclick="addInsight()" style="margin-top:6px;">💾 СОХРАНИТЬ ИНСАЙТ</button>
+        <button class="accent" onclick="submitInsight()" style="margin-top:6px;">💾 СОХРАНИТЬ ИНСАЙТ</button>
         <div id="insightsList" style="margin-top:10px;"></div>
     </div>
 
