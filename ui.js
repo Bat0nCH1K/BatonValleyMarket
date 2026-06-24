@@ -33,12 +33,16 @@ function selectItem(name) {
     selectedItem = name;
     document.getElementById('priceEntry').style.display = 'block';
     document.getElementById('selectedItemName').textContent = name;
-    document.getElementById('entryTime').value = new Date().toISOString().slice(0, 16);
+    const now = new Date();
+    now.setHours(now.getHours() + 3);
+    document.getElementById('entryTime').value = now.toISOString().slice(0, 16);
     renderItemAnalytics();
 }
 
 function submitPriceEntry() {
-    const time = document.getElementById('entryTime').value || new Date().toISOString().slice(0, 16);
+    const now = new Date();
+    now.setHours(now.getHours() + 3);
+    const time = document.getElementById('entryTime').value || now.toISOString().slice(0, 16);
     const buy = parseFloat(document.getElementById('entryBuy').value);
     const sell = parseFloat(document.getElementById('entrySell').value);
     const event = document.getElementById('entryEvent').value;
@@ -135,6 +139,12 @@ function renderTrades() {
             <div class="stat-item"><div class="value">${winRate.toFixed(0)}%</div><div class="label">УСПЕШНЫХ</div></div>
             <div class="stat-item"><div class="value">${getGlobalAccuracy()}%</div><div class="label">ТОЧНОСТЬ МОДЕЛИ</div></div>
         </div>`;
+}
+
+function deleteTrade(index) {
+    trades.splice(index, 1);
+    saveAll();
+    renderTrades();
 }
 
 // Аналитика
