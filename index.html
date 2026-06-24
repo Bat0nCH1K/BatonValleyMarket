@@ -9,6 +9,13 @@
 <body>
     <h1>☢️ WASTELAND MARKET TERMINAL</h1>
 
+    <!-- Баланс -->
+    <div class="balance-bar">
+        <span>💰 БАЛАНС:</span>
+        <input type="number" id="balanceInput" value="1000" step="0.01" onchange="updateBalance()">
+        <span id="balanceDisplay">1000.00</span>
+    </div>
+
     <div class="tabs">
         <div class="tab active" onclick="switchTab('items')">📦 ПРЕДМЕТЫ</div>
         <div class="tab" onclick="switchTab('trades')">💰 СДЕЛКИ</div>
@@ -36,6 +43,10 @@
                 <input type="number" id="entryBuy" placeholder="Цена покупки" step="0.01">
                 <input type="number" id="entrySell" placeholder="Цена продажи" step="0.01">
             </div>
+            <div class="checkbox-row">
+                <label><input type="checkbox" id="entryNerf"> 🔻 Нерф</label>
+                <label><input type="checkbox" id="entryBuff"> 🔺 Бафф</label>
+            </div>
             <div class="row">
                 <select id="entryEvent">
                     <option value="">Без события</option>
@@ -48,14 +59,9 @@
                         <option value="workshop">🔧 Цех модификаций</option>
                         <option value="bounty">🎯 Охота за головами</option>
                     </optgroup>
-                    <optgroup label="Баланс">
-                        <option value="nerf">🔻 Нерф предмета</option>
-                        <option value="buff">🔺 Бафф предмета</option>
+                    <optgroup label="Разовое">
                         <option value="new_item">🆕 Новый предмет</option>
-                    </optgroup>
-                    <optgroup label="Разное">
-                        <option value="gift">🎁 Подарки новичкам</option>
-                        <option value="bearings">⚙️ Событие с подшипниками</option>
+                        <option value="distribution">🎁 Раздача</option>
                     </optgroup>
                 </select>
             </div>
@@ -86,7 +92,9 @@
     <!-- Аналитика -->
     <div class="panel" id="tab-analytics">
         <h2>📊 САМООБУЧАЮЩАЯСЯ АНАЛИТИКА</h2>
-        <select id="analyticsItemSelect" onchange="renderAnalytics()"></select>
+        <div class="row">
+            <select id="analyticsItemSelect" multiple style="height:80px;" onchange="renderAnalytics()"></select>
+        </div>
         <div id="analyticsContent"></div>
     </div>
 
@@ -105,20 +113,16 @@
                     <option value="workshop">🔧 Цех модификаций</option>
                     <option value="bounty">🎯 Охота за головами</option>
                 </optgroup>
-                <optgroup label="Баланс">
-                    <option value="nerf">🔻 Нерф</option>
-                    <option value="buff">🔺 Бафф</option>
+                <optgroup label="Разовое">
                     <option value="new_item">🆕 Новый предмет</option>
-                </optgroup>
-                <optgroup label="Разное">
-                    <option value="gift">🎁 Подарки новичкам</option>
-                    <option value="bearings">⚙️ Событие с подшипниками</option>
+                    <option value="distribution">🎁 Раздача</option>
                 </optgroup>
             </select>
             <input type="text" id="eventDesc" placeholder="Описание">
             <button class="accent" onclick="addEvent()">➕</button>
         </div>
-        <div id="eventsList"></div>
+        <div class="calendar" id="calendarWidget"></div>
+        <div id="eventsList" style="margin-top:10px;"></div>
     </div>
 
     <!-- Инсайты -->
@@ -134,4 +138,4 @@
 
     <script src="app.js"></script>
 </body>
-  </html>
+</html>
