@@ -1,42 +1,82 @@
-// Wasteland Market Terminal — ui.js (графики + фикс предсказаний)
-let currentTab = 'items';
+// Wasteland Market Terminal — ui.js
+let currentScreen = 'items';
+let marketTab = 'overview';
 let calendarYear, calendarMonth;
 
 document.getElementById('balanceInput').value = balance;
-document.getElementById('balanceDisplay').textContent = balance.toFixed(2);
 
-function switchTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    const tabIndex = { items: 0, trades: 1, analytics: 2, events: 3, insights: 4 }[tab];
-    document.querySelectorAll('.tab')[tabIndex].classList.add('active');
-    document.getElementById('tab-' + tab).classList.add('active');
-    if (tab === 'trades') renderTrades();
-    if (tab === 'analytics') { updateAnalyticsSelect(); renderAnalytics(); }
-    if (tab === 'events') { initCalendar(); renderEvents(); }
-    if (tab === 'insights') renderInsights();
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('open');
 }
 
-// Предметы
+function switchScreen(screen) {
+    currentScreen = screen;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + screen).classList.add('active');
+    if (screen === 'trades') renderTrades();
+    if (screen === 'events') { initCalendar(); renderEvents(); }
+    if (screen === 'market') renderMarket();
+}
+
+function switchMarketTab(tab) {
+    marketTab = tab;
+    document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    renderMarket();
+}
+
+// === ПРЕДМЕТЫ ===
 function addItemForm() {
     const name = document.getElementById('newItemName').value.trim();
-    const type = document.getElementById('newItemType').value.trim();
+    const type = document.getElementById('newItemType').value;
     if (!name) return;
     addItem(name, type);
     document.getElementById('newItemName').value = '';
-    document.getElementById('newItemType').value = '';
     renderItems();
 }
 
 function selectItem(name) {
     selectedItem = name;
-    document.getElementById('priceEntry').style.display = 'block';
-    document.getElementById('selectedItemName').textContent = name;
+    const container = document.getElementById('priceEntry');
+    const item = items.find(i => i.name === name);
+    const isPart = item && item.type === 'part';
     const now = new Date();
     now.setHours(now.getHours() + 3);
-    document.getElementById('entryTime').value = now.toISOString().slice(0, 16);
-    renderItemAnalytics();
+    const timeStr = now.toISOString().slice(0, 16);
+
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div class="price-panel">
+            <h3>📝 ${name}</h3>
+            <input type="datetime-local" id="entryTime" value="${timeStr}">
+            <div class="row">
+                <input type="number" id="entryBuy" placeholder="Цена покупки" step="0.01">
+                <input type="number" id="entrySell" placeholder="Цена продажи" step="0.01">
+            </div>
+            ${isPart ? `
+            <div style="display:flex;gap:12px;font-size:0.8em;margin-bottom:6px;">
+                <label><input type="checkbox" id="entryNerf"> 🔻 Нерф</label>
+                <label><input type="checkbox" id="entryBuff"> 🔺 Бафф</label>
+            </div>` : ''}
+            <select id="entryEvent">
+                <option value="">Без события</option>
+                <option value="factory">🏭 Фабрика</option>
+                <option value="rating_end">⚔️ Рейтинг</option>
+                <option value="battlepass">🎫 БП</option>
+                <option value="road">🛣️ Наследие</option>
+                <option value="raven">🐦‍⬛ Ворон</option>
+                <option value="workshop">🔧 Цех</option>
+                <option value="bounty">🎯 Охота</option>
+            </select>
+            <div class="row" style="margin-top:8px;">
+                <button class="accent" onclick="submitPriceEntry()">ЗАПИСАТЬ</button>
+                <button class="danger" onclick="deleteSelectedItem();renderItems();document.getElementById('priceEntry').style.display='none';">УДАЛИТЬ</button>
+            </div>
+            <div id="itemGraph"></div>
+        </div>`;
+    
+    renderItemGraph();
 }
 
 function submitPriceEntry() {
@@ -46,94 +86,76 @@ function submitPriceEntry() {
     const buy = parseFloat(document.getElementById('entryBuy').value);
     const sell = parseFloat(document.getElementById('entrySell').value);
     const event = document.getElementById('entryEvent').value;
-    const nerf = document.getElementById('entryNerf').checked;
-    const buff = document.getElementById('entryBuff').checked;
+    const nerf = document.getElementById('entryNerf')?.checked || false;
+    const buff = document.getElementById('entryBuff')?.checked || false;
     if (isNaN(buy) || isNaN(sell)) { alert('Введи цены'); return; }
     addPriceEntry(time, buy, sell, event, nerf, buff);
-    document.getElementById('entryBuy').value = '';
-    document.getElementById('entrySell').value = '';
-    document.getElementById('entryNerf').checked = false;
-    document.getElementById('entryBuff').checked = false;
-    renderItemAnalytics();
     renderItems();
+    selectItem(selectedItem);
 }
 
 function renderItems() {
     const list = document.getElementById('itemsList');
     if (items.length === 0) {
-        list.innerHTML = '<p style="color:#888;text-align:center;">Нет предметов.</p>';
+        list.innerHTML = '<p style="color:#888;text-align:center;">Нет предметов</p>';
         return;
     }
     list.innerHTML = items.map(item => {
-        const itemTrades = trades.filter(t => t.item === item.name);
-        const totalProfit = itemTrades.reduce((a, b) => a + b.profit, 0);
-        const profitColor = totalProfit >= 0 ? 'var(--profit)' : 'var(--loss)';
-        return `<div class="item-list-item" onclick="selectItem('${item.name}')">
-            <span>📦 ${item.name} <span style="color:#888;font-size:0.7em;">${item.type || ''}</span></span>
-            <span style="font-size:0.8em;">
-                ${(prices[item.name]||[]).length} зап. | 
-                ${itemTrades.length} сделок | 
-                <span style="color:${profitColor}">${totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(1)}</span>
-            </span>
+        const data = prices[item.name] || [];
+        const last = data[data.length - 1];
+        const lastBuy = last ? last.buy.toFixed(2) : '—';
+        return `<div class="item-card" onclick="selectItem('${item.name}')">
+            <div class="name">${item.type === 'resource' ? '⛏️' : '🔧'} ${item.name}</div>
+            <div class="stats">${data.length} записей | Последняя: ${lastBuy} ₽</div>
         </div>`;
     }).join('');
     updateTradeSelect();
-    updateInsightSelect();
-    updateAnalyticsSelect();
 }
 
-function renderItemAnalytics() {
+function renderItemGraph() {
     if (!selectedItem) return;
     const data = prices[selectedItem] || [];
-    const container = document.getElementById('itemAnalytics');
+    const container = document.getElementById('itemGraph');
     if (data.length < 3) {
-        container.innerHTML = '<p style="color:#888;font-size:0.8em;">📊 Нужно минимум 3 записи для аналитики. Сейчас: ' + data.length + '</p>';
+        container.innerHTML = '<p style="color:#888;font-size:0.8em;">📊 Нужно 3+ записи для графика</p>';
         return;
     }
-    const pred = getPrediction(selectedItem);
-    const itemInsights = insights.filter(i => i.item === selectedItem);
-    
-    // Мини-график
+
     const buys = data.map(p => p.buy);
-    const sells = data.map(p => p.sell);
-    const allVals = buys.concat(sells);
-    const maxVal = Math.max(...allVals);
-    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...buys);
+    const minVal = Math.min(...buys);
     const range = maxVal - minVal || 1;
-    
-    let graphHTML = '<div style="height:40px;display:flex;align-items:flex-end;gap:2px;margin:8px 0;">';
-    data.forEach(p => {
-        const buyH = ((p.buy - minVal) / range) * 100;
-        const sellH = ((p.sell - minVal) / range) * 100;
-        graphHTML += `<div style="flex:1;display:flex;flex-direction:column;gap:1px;">
-            <div style="height:${sellH}%;background:var(--profit);opacity:0.5;border-radius:1px;" title="Продажа: ${p.sell}"></div>
-            <div style="height:${buyH}%;background:var(--accent);border-radius:1px;" title="Покупка: ${p.buy}"></div>
-        </div>`;
+    const pred = getPrediction(selectedItem);
+
+    // SVG график
+    const w = 100, h = 40, pad = 2;
+    let points = '';
+    buys.forEach((b, i) => {
+        const x = pad + (i / Math.max(buys.length - 1, 1)) * (w - pad * 2);
+        const y = h - pad - ((b - minVal) / range) * (h - pad * 2);
+        points += `${x},${y} `;
     });
-    graphHTML += '</div>';
-    
-    // Линейный график тренда
-    let lineGraph = '<svg width="100%" height="30" style="margin:4px 0;"><polyline points="';
-    data.forEach((p, i) => {
-        const x = (i / Math.max(data.length - 1, 1)) * 100;
-        const y = 28 - ((p.buy - minVal) / range) * 26;
-        lineGraph += `${x},${y} `;
-    });
-    lineGraph += `" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>`;
-    
+
+    // Линия предсказания
+    const lastX = pad + (w - pad * 2);
+    const lastY = h - pad - ((buys[buys.length - 1] - minVal) / range) * (h - pad * 2);
+    const predY = lastY - pred.slope * 3600 * 10; // проекция на 10 часов
+
     container.innerHTML = `
-        <div style="font-size:0.7em;color:#888;">📈 Тренд цены покупки:</div>
-        ${lineGraph}
-        <div style="font-size:0.7em;color:#888;">📊 Объёмы (зелёный=продажа, оранж=покупка):</div>
-        ${graphHTML}
-        <div class="prediction ${pred.class}" style="font-size:0.85em;">${pred.text}</div>
-        <div style="font-size:0.7em;color:#888;margin-top:4px;">
-            Точность: ${getModelAccuracy(selectedItem)}% | Уверенность: ${(pred.confidence*100).toFixed(0)}%
-        </div>
-        ${itemInsights.length > 0 ? `<div style="margin-top:8px;font-size:0.75em;color:var(--accent);">💡 Инсайтов: ${itemInsights.length}</div>` : ''}`;
+        <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:60px;background:#0a0f0f;border-radius:4px;margin-top:8px;">
+            <polyline points="${points}" fill="none" stroke="#d4a574" stroke-width="1.5"/>
+            <line x1="${lastX}" y1="${lastY}" x2="${w}" y2="${Math.max(0, Math.min(h, predY))}" stroke="#d4a574" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/>
+        </svg>
+        <div class="status-badge ${pred.class}">${pred.text}</div>
+        <div class="stat-row">
+            <div class="stat-box"><div class="val">${pred.avgBuy.toFixed(2)}</div><div class="lbl">Средняя</div></div>
+            <div class="stat-box"><div class="val">${pred.volatility.toFixed(2)}</div><div class="lbl">Волатильность</div></div>
+            <div class="stat-box"><div class="val">${(pred.confidence*100).toFixed(0)}%</div><div class="lbl">Уверенность</div></div>
+            <div class="stat-box"><div class="val">${getModelAccuracy(selectedItem)}%</div><div class="lbl">Точность</div></div>
+        </div>`;
 }
 
-// Сделки
+// === СДЕЛКИ ===
 function updateTradeSelect() {
     const select = document.getElementById('tradeItemSelect');
     select.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
@@ -143,154 +165,53 @@ function submitTrade() {
     const item = document.getElementById('tradeItemSelect').value;
     const buyPrice = parseFloat(document.getElementById('tradeBuyPrice').value);
     const sellPrice = parseFloat(document.getElementById('tradeSellPrice').value);
-    if (!item || isNaN(buyPrice) || isNaN(sellPrice)) { alert('Заполни все поля'); return; }
+    if (!item || isNaN(buyPrice) || isNaN(sellPrice)) { alert('Заполни'); return; }
     addTrade(item, buyPrice, sellPrice);
     document.getElementById('tradeBuyPrice').value = '';
     document.getElementById('tradeSellPrice').value = '';
     renderTrades();
-    renderItems();
 }
 
 function renderTrades() {
     const tbody = document.querySelector('#tradesTable tbody');
     tbody.innerHTML = trades.map((t, i) => `
         <tr>
-            <td>📦 ${t.item}</td>
-            <td>${t.buyPrice.toFixed(2)}</td>
-            <td>${t.sellPrice.toFixed(2)}</td>
+            <td>${t.item}</td><td>${t.buyPrice.toFixed(2)}</td><td>${t.sellPrice.toFixed(2)}</td>
             <td style="color:${t.profit>=0?'var(--profit)':'var(--loss)'}">${t.profit.toFixed(2)}</td>
             <td style="color:${t.profit>=0?'var(--profit)':'var(--loss)'}">${t.profitPct.toFixed(1)}%</td>
-            <td>${(t.confidence*100).toFixed(0)}%</td>
-            <td><button class="delete-btn" onclick="deleteTrade(${i})">✕</button></td>
+            <td><button class="delete-btn" onclick="trades.splice(${i},1);saveAll();renderTrades();">✕</button></td>
         </tr>
     `).join('');
-    const totalProfit = trades.reduce((a,b) => a + b.profit, 0);
-    const winRate = trades.length > 0 ? (trades.filter(t => t.profit > 0).length / trades.length * 100) : 0;
+    const tp = trades.reduce((a,b) => a + b.profit, 0);
+    const wr = trades.length > 0 ? (trades.filter(t => t.profit > 0).length / trades.length * 100) : 0;
     document.getElementById('tradeStats').innerHTML = `
-        <div class="stats-grid">
-            <div class="stat-item"><div class="value" style="color:${totalProfit>=0?'var(--profit)':'var(--loss)'}">${totalProfit.toFixed(2)}</div><div class="label">ОБЩАЯ ПРИБЫЛЬ</div></div>
-            <div class="stat-item"><div class="value">${trades.length}</div><div class="label">ВСЕГО СДЕЛОК</div></div>
-            <div class="stat-item"><div class="value">${winRate.toFixed(0)}%</div><div class="label">УСПЕШНЫХ</div></div>
-            <div class="stat-item"><div class="value">${getGlobalAccuracy()}%</div><div class="label">ТОЧНОСТЬ МОДЕЛИ</div></div>
+        <div class="stat-row">
+            <div class="stat-box"><div class="val" style="color:${tp>=0?'var(--profit)':'var(--loss)'}">${tp.toFixed(2)}</div><div class="lbl">Прибыль</div></div>
+            <div class="stat-box"><div class="val">${trades.length}</div><div class="lbl">Сделок</div></div>
+            <div class="stat-box"><div class="val">${wr.toFixed(0)}%</div><div class="lbl">Успех</div></div>
+            <div class="stat-box"><div class="val">${getGlobalAccuracy()}%</div><div class="lbl">Точность</div></div>
         </div>`;
 }
 
-function deleteTrade(index) {
-    trades.splice(index, 1);
-    saveAll();
-    renderTrades();
-}
-
-// Аналитика
-function updateAnalyticsSelect() {
-    const select = document.getElementById('analyticsItemSelect');
-    select.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-}
-
-function renderAnalytics() {
-    const select = document.getElementById('analyticsItemSelect');
-    const selectedItems = Array.from(select.selectedOptions).map(o => o.value);
-    const container = document.getElementById('analyticsContent');
-    if (selectedItems.length === 0) {
-        container.innerHTML = '<p style="color:#888;">Выберите предметы для сравнения.</p>';
-        return;
-    }
-    let allPrices = [];
-    selectedItems.forEach(item => {
-        (prices[item] || []).forEach(p => allPrices.push({ item, ...p }));
-    });
-    if (allPrices.length === 0) {
-        container.innerHTML = '<p style="color:#888;">Нет данных для выбранных предметов.</p>';
-        return;
-    }
-    allPrices.sort((a,b) => new Date(a.time) - new Date(b.time));
-    const maxPrice = Math.max(...allPrices.map(p => p.buy));
-    const minPrice = Math.min(...allPrices.map(p => p.buy));
-    const range = maxPrice - minPrice || 1;
-
-    // Группировка по дням
-    const days = {};
-    allPrices.forEach(p => {
-        const day = p.time.slice(0, 10);
-        if (!days[day]) days[day] = {};
-        if (!days[day][p.item]) days[day][p.item] = [];
-        days[day][p.item].push(p.buy);
-    });
-
-    // Столбцы + линия
-    const dayKeys = Object.keys(days).sort();
-    let barHTML = '<div style="display:flex;align-items:flex-end;gap:2px;height:60px;margin:8px 0;">';
-    dayKeys.forEach(day => {
-        barHTML += '<div style="flex:1;display:flex;flex-direction:column;gap:1px;align-items:center;">';
-        selectedItems.forEach(item => {
-            const vals = (days[day] || {})[item] || [];
-            const avg = vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : 0;
-            const h = ((avg - minPrice) / range) * 100;
-            const color = stringToColor(item);
-            barHTML += `<div style="height:${h}%;width:60%;background:${color};border-radius:1px;" title="${item}: ${avg.toFixed(2)}"></div>`;
-        });
-        barHTML += '</div>';
-    });
-    barHTML += '</div>';
-
-    // SVG линия для первого предмета
-    let lineHTML = '';
-    if (selectedItems.length === 1) {
-        const item = selectedItems[0];
-        const data = prices[item] || [];
-        if (data.length >= 2) {
-            const buys = data.map(p => p.buy);
-            const maxB = Math.max(...buys);
-            const minB = Math.min(...buys);
-            const rng = maxB - minB || 1;
-            lineHTML = '<svg width="100%" height="40" style="margin:4px 0;"><polyline points="';
-            buys.forEach((b, i) => {
-                const x = (i / Math.max(buys.length - 1, 1)) * 100;
-                const y = 38 - ((b - minB) / rng) * 36;
-                lineHTML += `${x},${y} `;
-            });
-            lineHTML += `" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>`;
-        }
-    }
-
-    let statsHTML = '<div class="stats-grid">';
-    selectedItems.forEach(item => {
-        const data = prices[item] || [];
-        if (data.length === 0) return;
-        const buys = data.map(p => p.buy);
-        const avgBuy = buys.reduce((a,b) => a+b, 0) / buys.length;
-        statsHTML += `<div class="stat-item"><div class="value">${avgBuy.toFixed(2)}</div><div class="label">${item} (ср.)</div></div>`;
-    });
-    statsHTML += '</div>';
-    container.innerHTML = lineHTML + barHTML + statsHTML;
-}
-
-function stringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    return `hsl(${hash % 360}, 50%, 60%)`;
-}
-
-// События
+// === СОБЫТИЯ ===
 function submitEvent() {
     const date = document.getElementById('eventDate').value;
     const type = document.getElementById('eventType').value;
-    const desc = document.getElementById('eventDesc').value.trim();
+    const desc = '';
     if (!date) return;
     addEvent(date, type, desc);
-    document.getElementById('eventDesc').value = '';
     renderEvents();
     initCalendar();
 }
 
 function renderEvents() {
     const list = document.getElementById('eventsList');
-    if (events.length === 0) { list.innerHTML = '<p style="color:#888;">Нет событий.</p>'; return; }
-    const emoji = { factory: '🏭', rating_end: '⚔️', battlepass: '🎫', road: '🛣️', raven: '🐦‍⬛', workshop: '🔧', bounty: '🎯', nerf: '🔻', buff: '🔺', new_item: '🆕', distribution: '🎁' };
-    const tagClass = { factory: 'tag-factory', rating_end: 'tag-rating', battlepass: 'tag-battlepass', road: 'tag-road', raven: 'tag-raven', workshop: 'tag-workshop', bounty: 'tag-bounty', nerf: 'tag-nerf', buff: 'tag-buff', distribution: 'tag-distribution' };
+    if (events.length === 0) { list.innerHTML = '<p style="color:#888;">Нет событий</p>'; return; }
+    const emoji = { factory: '🏭', rating_end: '⚔️', battlepass: '🎫', road: '🛣️', raven: '🐦‍⬛', workshop: '🔧', bounty: '🎯' };
+    const tagClass = { factory: 'tag-factory', rating_end: 'tag-rating', battlepass: 'tag-battlepass', road: 'tag-road', raven: 'tag-raven', workshop: 'tag-workshop', bounty: 'tag-bounty' };
     list.innerHTML = events.map((e, i) => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
-            <span><span class="tag ${tagClass[e.type]||''}">${emoji[e.type]||'📌'}</span> ${e.date} — ${e.desc || e.type}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:0.8em;">
+            <span><span class="tag ${tagClass[e.type]||''}">${emoji[e.type]||'📌'}</span> ${e.date}</span>
             <button class="delete-btn" onclick="deleteEvent(${i});renderEvents();initCalendar();">✕</button>
         </div>
     `).join('');
@@ -316,7 +237,7 @@ function renderCalendar() {
     ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(d => html += `<div class="calendar-day-name">${d}</div>`);
     for (let i = 1; i < firstDay; i++) html += '<div class="calendar-day other-month"></div>';
     for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const dateStr = `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         const hasEvent = events.some(e => e.date === dateStr);
         const isToday = dateStr === todayStr;
         let cls = 'calendar-day';
@@ -335,37 +256,47 @@ function changeMonth(delta) {
     renderCalendar();
 }
 
-// Инсайты
-function updateInsightSelect() {
-    const select = document.getElementById('insightItemSelect');
-    select.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+// === РЫНОК ===
+function renderMarket() {
+    const container = document.getElementById('marketContent');
+    let filtered = items;
+    if (marketTab === 'resources') filtered = items.filter(i => i.type === 'resource');
+    if (marketTab === 'parts') filtered = items.filter(i => i.type === 'part');
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p style="color:#888;">Нет предметов в этой категории</p>';
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(item => {
+        const data = prices[item.name] || [];
+        if (data.length < 2) return;
+        const pred = getPrediction(item.name);
+        html += `<div class="item-card" onclick="switchScreen('items');selectItem('${item.name}');" style="cursor:pointer;">
+            <div class="name">${item.type==='resource'?'⛏️':'🔧'} ${item.name}</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+                <span style="font-size:0.8em;">${pred.avgBuy.toFixed(2)} ₽</span>
+                <span class="status-badge ${pred.class}" style="font-size:0.65em;padding:2px 6px;">${pred.slope > 0.5 ? '📈' : pred.slope < -0.5 ? '📉' : '📊'} ${pred.slope.toFixed(1)}/ч</span>
+            </div>
+        </div>`;
+    });
+
+    // Общий график рынка
+    let allBuys = [];
+    filtered.forEach(item => {
+        (prices[item.name] || []).forEach(p => allBuys.push(p.buy));
+    });
+    if (allBuys.length > 2) {
+        const avgAll = allBuys.reduce((a,b) => a+b, 0) / allBuys.length;
+        html += `<div class="stat-box" style="margin-top:10px;"><div class="val">${avgAll.toFixed(2)}</div><div class="lbl">Средняя цена по категории</div></div>`;
+    }
+
+    container.innerHTML = html || '<p style="color:#888;">Недостаточно данных</p>';
 }
 
-function submitInsight() {
-    const item = document.getElementById('insightItemSelect').value;
-    const text = document.getElementById('insightText').value.trim();
-    if (!item || !text) { alert('Выбери предмет и напиши наблюдение'); return; }
-    addInsight(item, text);
-    document.getElementById('insightText').value = '';
-    renderInsights();
-}
-
-function renderInsights() {
-    const list = document.getElementById('insightsList');
-    if (insights.length === 0) { list.innerHTML = '<p style="color:#888;">Нет инсайтов.</p>'; return; }
-    list.innerHTML = insights.map((ins, i) => `
-        <div class="insight-box">
-            <div style="font-size:0.8em;color:var(--accent);margin-bottom:4px;">📦 ${ins.item} — ${new Date(ins.date).toLocaleDateString('ru-RU')}</div>
-            <div>${ins.text}</div>
-            <button class="delete-btn" onclick="deleteInsight(${i});renderInsights();" style="margin-top:4px;">✕</button>
-        </div>
-    `).join('');
-}
-
-// Инициализация
+// === ИНИЦИАЛИЗАЦИЯ ===
 renderItems();
 renderEvents();
 updateTradeSelect();
-updateInsightSelect();
-updateAnalyticsSelect();
 if (items.length > 0) selectItem(items[0].name);
