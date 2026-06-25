@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — market.js (рынок + склад + сделки + обзор)
+// Wasteland Market Terminal — market.js (фикс склада + консоль)
 let currentScreen = 'items';
 let marketTab = 'overview';
 
@@ -21,6 +21,7 @@ function switchScreen(screen) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById('screen-' + screen);
     if (target) target.classList.add('active');
+    log('📱 Экран: ' + screen);
     if (screen === 'items') renderItems();
     if (screen === 'trades') renderTrades();
     if (screen === 'events') { if (typeof initCalendar === 'function') initCalendar(); if (typeof renderEvents === 'function') renderEvents(); }
@@ -159,31 +160,56 @@ function renderItemGraph() {
 }
 
 // === СКЛАД ===
-function updateStorageSelect() { const s = document.getElementById('storageItemSelect'); if (s) s.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join(''); }
+function updateStorageSelect() {
+    const s = document.getElementById('storageItemSelect');
+    if (s) s.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+}
+
 function addToStorage() {
-    const item = document.getElementById('storageItemSelect').value;
-    const qty = parseInt(document.getElementById('storageQty').value) || 1;
-    const modded = document.getElementById('storageModded').checked;
-    if (!item) { alert('Выбери предмет'); return; }
+    const selectEl = document.getElementById('storageItemSelect');
+    const qtyEl = document.getElementById('storageQty');
+    const moddedEl = document.getElementById('storageModded');
+    
+    if (!selectEl || !qtyEl || !moddedEl) {
+        alert('Ошибка: не найдены поля формы');
+        return;
+    }
+    
+    const item = selectEl.value;
+    const qty = parseInt(qtyEl.value) || 1;
+    const modded = moddedEl.checked;
+    
+    if (!item) { alert('Выбери предмет из списка'); return; }
     
     const data = prices[item] || [];
     const lastPrice = data.length > 0 ? Number(data[data.length - 1].buy) : 0;
     
+    // Вызываем глобальную addToStorage из core.js
     addToStorage(item, qty, lastPrice, modded);
-    document.getElementById('storageQty').value = '1';
-    document.getElementById('storageModded').checked = false;
+    qtyEl.value = '1';
+    moddedEl.checked = false;
     renderStorage();
-    log('✅ Добавлено на склад: ' + item + ' ×' + qty);
+    log('✅ Склад: ' + item + ' ×' + qty);
 }
+
 function renderStorage() {
-    const list = document.getElementById('storageList'), totalEl = document.getElementById('storageTotal');
+    const list = document.getElementById('storageList');
+    const totalEl = document.getElementById('storageTotal');
     if (!list) return;
-    if (storageItems.length === 0) { list.innerHTML = '<p style="color:#888;">Склад пуст</p>'; if (totalEl) totalEl.innerHTML = ''; return; }
+    if (storageItems.length === 0) {
+        list.innerHTML = '<p style="color:#888;">Склад пуст</p>';
+        if (totalEl) totalEl.innerHTML = '';
+        return;
+    }
     let tv = 0, ti = 0;
     list.innerHTML = storageItems.map((s, i) => {
-        const data = prices[s.item] || [], price = data.length > 0 ? data[data.length - 1].sell : 0;
-        const item = items.find(it => it.name === s.item), ls = item ? item.lotSize : 1;
-        const val = price * s.qty / ls, inv = s.buyPrice * s.qty, prof = val - inv;
+        const currentData = prices[s.item] || [];
+        const currentPrice = currentData.length > 0 ? currentData[currentData.length - 1].sell : 0;
+        const itemObj = items.find(it => it.name === s.item);
+        const ls = itemObj ? itemObj.lotSize : 1;
+        const val = currentPrice * s.qty / ls;
+        const inv = s.buyPrice * s.qty;
+        const prof = val - inv;
         tv += val; ti += inv;
         return `<div class="item-card"><div class="name">${s.item} ×${s.qty} ${s.modded ? '🔧' : ''}</div><div class="stats">Вложено: ${inv.toFixed(2)} | Сейчас: ${val.toFixed(2)} | <span style="color:${prof>=0?'var(--profit)':'var(--loss)'}">${prof>=0?'+':''}${prof.toFixed(2)}</span></div><button class="delete-btn" onclick="removeFromStorage(${i});renderStorage();">✕</button></div>`;
     }).join('');
@@ -197,7 +223,7 @@ function submitTrade() {
     const item = document.getElementById('tradeItemSelect').value, buy = parseFloat(document.getElementById('tradeBuyPrice').value), sell = parseFloat(document.getElementById('tradeSellPrice').value);
     if (!item || isNaN(buy) || isNaN(sell)) { alert('Заполни'); return; }
     addTrade(item, buy, sell);
-    document.getElementById('tradeBuyPrice').value = ''; document.getElementById('tradeSellPrice').value = ''; renderTrades();
+    document.getElementById('tradeBuyPrice').value = ''; document.getElementById('tradeSellPrice').value = ''; renderTrades(); renderStorage();
 }
 function renderTrades() {
     const tbody = document.querySelector('#tradesTable tbody');
