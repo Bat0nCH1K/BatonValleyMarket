@@ -1,18 +1,16 @@
 // Wasteland Market Terminal — core.js (данные и логика)
-const STORAGE_ITEMS = 'wl_items_v3';
-const STORAGE_PRICES = 'wl_prices_v3';
-const STORAGE_TRADES = 'wl_trades_v3';
-const STORAGE_EVENTS = 'wl_events_v3';
-const STORAGE_PREDICTIONS = 'wl_predictions_v3';
-const STORAGE_INSIGHTS = 'wl_insights_v3';
-const STORAGE_BALANCE = 'wl_balance_v3';
+const STORAGE_ITEMS = 'wl_items_v4';
+const STORAGE_PRICES = 'wl_prices_v4';
+const STORAGE_TRADES = 'wl_trades_v4';
+const STORAGE_EVENTS = 'wl_events_v4';
+const STORAGE_PREDICTIONS = 'wl_predictions_v4';
+const STORAGE_BALANCE = 'wl_balance_v4';
 
 let items = JSON.parse(localStorage.getItem(STORAGE_ITEMS) || '[]');
 let prices = JSON.parse(localStorage.getItem(STORAGE_PRICES) || '{}');
 let trades = JSON.parse(localStorage.getItem(STORAGE_TRADES) || '[]');
 let events = JSON.parse(localStorage.getItem(STORAGE_EVENTS) || '[]');
 let predictions = JSON.parse(localStorage.getItem(STORAGE_PREDICTIONS) || '{}');
-let insights = JSON.parse(localStorage.getItem(STORAGE_INSIGHTS) || '[]');
 let balance = parseFloat(localStorage.getItem(STORAGE_BALANCE) || '1000');
 let selectedItem = null;
 
@@ -22,13 +20,11 @@ function saveAll() {
     localStorage.setItem(STORAGE_TRADES, JSON.stringify(trades));
     localStorage.setItem(STORAGE_EVENTS, JSON.stringify(events));
     localStorage.setItem(STORAGE_PREDICTIONS, JSON.stringify(predictions));
-    localStorage.setItem(STORAGE_INSIGHTS, JSON.stringify(insights));
     localStorage.setItem(STORAGE_BALANCE, balance);
 }
 
 function updateBalance() {
     balance = parseFloat(document.getElementById('balanceInput').value) || 0;
-    document.getElementById('balanceDisplay').textContent = balance.toFixed(2);
     localStorage.setItem(STORAGE_BALANCE, balance);
 }
 
@@ -44,7 +40,7 @@ function addItem(name, type) {
 
 function deleteSelectedItem() {
     if (!selectedItem) return;
-    if (confirm('Удалить "' + selectedItem + '" и все данные?')) {
+    if (confirm('Удалить "' + selectedItem + '"?')) {
         items = items.filter(i => i.name !== selectedItem);
         delete prices[selectedItem];
         delete predictions[selectedItem];
@@ -82,7 +78,6 @@ function addTrade(item, buyPrice, sellPrice) {
     });
     balance += profit;
     document.getElementById('balanceInput').value = balance.toFixed(2);
-    document.getElementById('balanceDisplay').textContent = balance.toFixed(2);
     saveAll();
 }
 
@@ -99,43 +94,68 @@ function deleteEvent(index) {
     saveAll();
 }
 
-// Инсайты
-function addInsight(item, text) {
-    if (!item || !text) return;
-    insights.push({ item, text, date: new Date().toISOString() });
-    saveAll();
-}
-
-function deleteInsight(index) {
-    insights.splice(index, 1);
-    saveAll();
-}
-
-// Предсказание
+// Предсказание (по углу наклона линии тренда)
 function getPrediction(item) {
     const data = prices[item] || [];
-    if (data.length < 3) return { signal: 0, confidence: 0, trend: 0, volatility: 0, text: '📊 НЕДОСТАТОЧНО ДАННЫХ', class: 'stable' };
+    if (data.length < 3) return { signal: 0, confidence: 0, text: '📊 МАЛО ДАННЫХ', class: 'stable' };
+
     const buys = data.map(p => p.buy);
     const sells = data.map(p => p.sell);
-    const avgBuy = buys.reduce((a,b) => a+b, 0) / buys.length;
-    const avgSell = sells.reduce((a,b) => a+b, 0) / sells.length;
-    const recent = data.slice(-5);
-    const recentAvgBuy = recent.reduce((a,b) => a+b.buy, 0) / recent.length;
-    const trend = ((recentAvgBuy - avgBuy) / avgBuy) * 100;
-    const variance = buys.map(b => (b - avgBuy) ** 2).reduce((a,b) => a+b, 0) / buys.length;
+    const n = buys.length;
+
+    // Линейная регрессия: угол наклона (slope) по времени
+    const times = data.map((p, i) => new Date(p.time).getTime());
+    const tMean = times.reduce((a, b) => a + b, 0) / n;
+    const buyMean = buys.reduce((a, b) => a + b, 0) / n;
+
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+        num += (times[i] - tMean) * (buys[i] - buyMean);
+        den += (times[i] - tMean) ** 2;
+    }
+    const slope = den ? num / den : 0; // голды в миллисекунду
+    const slopePerHour = slope * 3600000; // голды в час
+
+    // Волатильность
+    const variance = buys.reduce((a, b) => a + (b - buyMean) ** 2, 0) / n;
     const volatility = Math.sqrt(variance);
-    let signal = 0, confidence = 0.5, text = '', cls = 'stable';
-    if (trend > 1.5) { signal = 0; text = '📈 ЦЕНА РАСТЁТ — продавать или ждать'; cls = 'up'; }
-    else if (trend < -1.5) { signal = 1; text = '📉 ЦЕНА ПАДАЕТ — хороший момент для покупки'; cls = 'down'; }
-    else { signal = 0.1; text = '📊 ЦЕНА СТАБИЛЬНА — можно торговать в коридоре'; cls = 'stable'; }
+
+    // Определяем тренд по углу наклона относительно волатильности
+    const trendStrength = volatility ? Math.abs(slopePerHour) / volatility : 0;
+
+    let signal, text, cls;
+    if (slopePerHour < -0.5 || (slopePerHour < 0 && trendStrength > 0.3)) {
+        signal = 1;
+        text = `📉 ПАДАЕТ (${slopePerHour.toFixed(1)} голды/ч) — покупать`;
+        cls = 'down';
+    } else if (slopePerHour > 0.5 || (slopePerHour > 0 && trendStrength > 0.3)) {
+        signal = 0;
+        text = `📈 РАСТЁТ (${slopePerHour.toFixed(1)} голды/ч) — продавать`;
+        cls = 'up';
+    } else {
+        signal = 0.5;
+        text = `📊 СТАБИЛЬНО (${slopePerHour.toFixed(1)} голды/ч)`;
+        cls = 'stable';
+    }
+
     const lastBuy = buys[buys.length - 1];
     const lastSell = sells[buys.length - 1];
-    if (lastBuy < avgBuy * 0.95) { text += '\n💡 ЦЕНА НИЖЕ СРЕДНЕГО — покупать!'; signal = 1; cls = 'down'; }
-    if (lastSell > avgSell * 1.05) { text += '\n💰 ЦЕНА ВЫШЕ СРЕДНЕГО — продавать!'; signal = 0; cls = 'up'; }
-    confidence = Math.min(0.9, 0.5 + Math.abs(trend) / 20 + (data.length > 10 ? 0.2 : 0));
+    const avgBuy = buyMean;
+    const avgSell = sells.reduce((a, b) => a + b, 0) / n;
+
+    if (lastBuy < avgBuy * 0.95) { text += '\n💡 Ниже среднего — покупать!'; signal = 1; cls = 'down'; }
+    if (lastSell > avgSell * 1.05) { text += '\n💰 Выше среднего — продавать!'; signal = 0; cls = 'up'; }
+
+    const confidence = Math.min(0.9, 0.4 + trendStrength * 2 + (n > 10 ? 0.2 : 0));
     const accuracy = getModelAccuracy(item);
-    if (accuracy < 40) confidence *= 0.5;
-    return { signal, confidence, trend, volatility, text, class: cls };
+    const finalConfidence = accuracy < 40 ? confidence * 0.5 : confidence;
+
+    return {
+        signal, confidence: finalConfidence,
+        slope: slopePerHour, volatility,
+        avgBuy, avgSell, lastBuy, lastSell,
+        text, class: cls
+    };
 }
 
 function updatePredictions(item) {
@@ -164,4 +184,4 @@ function getGlobalAccuracy() {
         correct += withActual.filter(p => (p.predicted > 0.5 && p.actual === 1) || (p.predicted <= 0.5 && p.actual === 0)).length;
     });
     return total > 0 ? Math.round((correct / total) * 100) : 0;
-}
+        }
