@@ -7,133 +7,80 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>☢️ WASTELAND MARKET TERMINAL</h1>
-
-    <!-- Баланс -->
-    <div class="balance-bar">
-        <span>💰 БАЛАНС:</span>
-        <input type="number" id="balanceInput" value="1000" step="0.01" onchange="updateBalance()">
-        <span id="balanceDisplay">1000.00</span>
+    <div class="header">
+        <button class="burger" onclick="toggleSidebar()">☰</button>
+        <h1>☢️ WASTELAND MARKET</h1>
+        <div class="header-balance">
+            <span>💰</span>
+            <input type="number" id="balanceInput" value="1000" step="0.01" onchange="updateBalance()">
+        </div>
     </div>
 
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('items')">📦 ПРЕДМЕТЫ</div>
-        <div class="tab" onclick="switchTab('trades')">💰 СДЕЛКИ</div>
-        <div class="tab" onclick="switchTab('analytics')">📊 АНАЛИТИКА</div>
-        <div class="tab" onclick="switchTab('events')">📅 СОБЫТИЯ</div>
-        <div class="tab" onclick="switchTab('insights')">💡 ИНСАЙТЫ</div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <button onclick="switchScreen('items');toggleSidebar()">📦 Предметы</button>
+        <button onclick="switchScreen('trades');toggleSidebar()">💰 Сделки</button>
+        <button onclick="switchScreen('events');toggleSidebar()">📅 События</button>
+        <button onclick="switchScreen('market');toggleSidebar()">📊 Рынок</button>
     </div>
 
-    <!-- Предметы и цены -->
-    <div class="panel active" id="tab-items">
-        <h2>📦 ПРЕДМЕТЫ НАБЛЮДЕНИЯ</h2>
+    <!-- Предметы -->
+    <div class="screen active" id="screen-items">
+        <h2>📦 ПРЕДМЕТЫ</h2>
         <div class="row">
-            <input type="text" id="newItemName" placeholder="Название предмета">
-            <input type="text" id="newItemType" placeholder="Тип (ресурс/оружие/кабина/колёса/модуль)">
-            <button class="accent" onclick="addItemForm()">ДОБАВИТЬ</button>
+            <input type="text" id="newItemName" placeholder="Название">
+            <select id="newItemType">
+                <option value="resource">Ресурс</option>
+                <option value="part">Деталь</option>
+            </select>
+            <button class="accent" onclick="addItemForm()">➕</button>
         </div>
         <div id="itemsList"></div>
-
-        <div id="priceEntry" style="display:none; margin-top:10px;">
-            <h2>📝 ЗАПИСЬ ДЛЯ: <span id="selectedItemName"></span></h2>
-            <div class="row">
-                <input type="datetime-local" id="entryTime">
-            </div>
-            <div class="row">
-                <input type="number" id="entryBuy" placeholder="Цена покупки" step="0.01">
-                <input type="number" id="entrySell" placeholder="Цена продажи" step="0.01">
-            </div>
-            <div class="checkbox-row">
-                <label><input type="checkbox" id="entryNerf"> 🔻 Нерф</label>
-                <label><input type="checkbox" id="entryBuff"> 🔺 Бафф</label>
-            </div>
-            <div class="row">
-                <select id="entryEvent">
-                    <option value="">Без события</option>
-                    <optgroup label="Регулярные ивенты">
-                        <option value="factory">🏭 Подпольная фабрика</option>
-                        <option value="rating_end">⚔️ Конец рейтинга (раздача руды)</option>
-                        <option value="battlepass">🎫 Новый боевой пропуск</option>
-                        <option value="road">🛣️ Наследие пустоши</option>
-                        <option value="raven">🐦‍⬛ Дорога ворона</option>
-                        <option value="workshop">🔧 Цех модификаций</option>
-                        <option value="bounty">🎯 Охота за головами</option>
-                    </optgroup>
-                    <optgroup label="Разовое">
-                        <option value="new_item">🆕 Новый предмет</option>
-                        <option value="distribution">🎁 Раздача</option>
-                    </optgroup>
-                </select>
-            </div>
-            <div class="row">
-                <button class="accent" onclick="submitPriceEntry()">ЗАПИСАТЬ ЦЕНУ</button>
-                <button class="danger" onclick="deleteSelectedItem(); renderItems(); document.getElementById('priceEntry').style.display='none';">УДАЛИТЬ ПРЕДМЕТ</button>
-            </div>
-            <div id="itemAnalytics"></div>
-        </div>
+        <div id="priceEntry" style="display:none;"></div>
     </div>
 
     <!-- Сделки -->
-    <div class="panel" id="tab-trades">
-        <h2>💰 ЖУРНАЛ СДЕЛОК</h2>
+    <div class="screen" id="screen-trades">
+        <h2>💰 СДЕЛКИ</h2>
         <div class="row">
             <select id="tradeItemSelect"></select>
-            <input type="number" id="tradeBuyPrice" placeholder="Цена покупки" step="0.01">
-            <input type="number" id="tradeSellPrice" placeholder="Цена продажи" step="0.01">
-            <button class="accent" onclick="submitTrade()">ЗАПИСАТЬ СДЕЛКУ</button>
+            <input type="number" id="tradeBuyPrice" placeholder="Покупка" step="0.01">
+            <input type="number" id="tradeSellPrice" placeholder="Продажа" step="0.01">
+            <button class="accent" onclick="submitTrade()">OK</button>
         </div>
-        <table id="tradesTable">
-            <thead><tr><th>Предмет</th><th>Куплен</th><th>Продан</th><th>Прибыль</th><th>%</th><th>Уверенность</th><th></th></tr></thead>
-            <tbody></tbody>
-        </table>
-        <div id="tradeStats" style="margin-top:10px;"></div>
-    </div>
-
-    <!-- Аналитика -->
-    <div class="panel" id="tab-analytics">
-        <h2>📊 САМООБУЧАЮЩАЯСЯ АНАЛИТИКА</h2>
-        <div class="row">
-            <select id="analyticsItemSelect" multiple style="height:80px;" onchange="renderAnalytics()"></select>
-        </div>
-        <div id="analyticsContent"></div>
+        <table id="tradesTable"><thead><tr><th>Предмет</th><th>Куплен</th><th>Продан</th><th>+/-</th><th>%</th><th></th></tr></thead><tbody></tbody></table>
+        <div id="tradeStats"></div>
     </div>
 
     <!-- События -->
-    <div class="panel" id="tab-events">
-        <h2>📅 КАЛЕНДАРЬ СОБЫТИЙ</h2>
+    <div class="screen" id="screen-events">
+        <h2>📅 СОБЫТИЯ</h2>
         <div class="row">
             <input type="date" id="eventDate">
             <select id="eventType">
-                <optgroup label="Регулярные ивенты">
-                    <option value="factory">🏭 Подпольная фабрика</option>
-                    <option value="rating_end">⚔️ Конец рейтинга (раздача руды)</option>
-                    <option value="battlepass">🎫 Новый боевой пропуск</option>
-                    <option value="road">🛣️ Наследие пустоши</option>
-                    <option value="raven">🐦‍⬛ Дорога ворона</option>
-                    <option value="workshop">🔧 Цех модификаций</option>
-                    <option value="bounty">🎯 Охота за головами</option>
-                </optgroup>
-                <optgroup label="Разовое">
-                    <option value="new_item">🆕 Новый предмет</option>
-                    <option value="distribution">🎁 Раздача</option>
-                </optgroup>
+                <option value="factory">🏭 Фабрика</option>
+                <option value="rating_end">⚔️ Рейтинг</option>
+                <option value="battlepass">🎫 БП</option>
+                <option value="road">🛣️ Наследие</option>
+                <option value="raven">🐦‍⬛ Ворон</option>
+                <option value="workshop">🔧 Цех</option>
+                <option value="bounty">🎯 Охота</option>
             </select>
-            <input type="text" id="eventDesc" placeholder="Описание">
             <button class="accent" onclick="submitEvent()">➕</button>
         </div>
         <div class="calendar" id="calendarWidget"></div>
-        <div id="eventsList" style="margin-top:10px;"></div>
+        <div id="eventsList"></div>
     </div>
 
-    <!-- Инсайты -->
-    <div class="panel" id="tab-insights">
-        <h2>💡 ТВОИ НАБЛЮДЕНИЯ</h2>
-        <div class="row">
-            <select id="insightItemSelect"></select>
+    <!-- Рынок -->
+    <div class="screen" id="screen-market">
+        <h2>📊 РЫНОК</h2>
+        <div class="market-tabs">
+            <button class="market-tab active" onclick="switchMarketTab('overview')">📈 Общий</button>
+            <button class="market-tab" onclick="switchMarketTab('resources')">⛏️ Ресурсы</button>
+            <button class="market-tab" onclick="switchMarketTab('parts')">🔧 Детали</button>
         </div>
-        <textarea id="insightText" placeholder="Опиши закономерность. Например: После конца рейтинга руда дешевеет на 15% за 2 дня, потом восстанавливается."></textarea>
-        <button class="accent" onclick="submitInsight()" style="margin-top:6px;">💾 СОХРАНИТЬ ИНСАЙТ</button>
-        <div id="insightsList" style="margin-top:10px;"></div>
+        <div id="marketContent"></div>
     </div>
 
     <script src="core.js"></script>
