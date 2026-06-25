@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — core.js
+// Wasteland Market Terminal — core.js (фикс склада + авто-склад из сделок)
 const STORAGE_ITEMS = 'wl_items_v4';
 const STORAGE_PRICES = 'wl_prices_v4';
 const STORAGE_TRADES = 'wl_trades_v4';
@@ -71,11 +71,24 @@ function addTrade(item, buyPrice, sellPrice) {
     predictions[item].push({ date: new Date().toISOString(), predicted: pred.signal, actual: profit > 0 ? 1 : 0, confidence: pred.confidence });
     balance += profit;
     document.getElementById('balanceInput').value = balance.toFixed(2);
+    
+    // Авто-склад: при покупке добавляем предмет
+    const itemObj = items.find(i => i.name === item);
+    const lotSize = itemObj ? itemObj.lotSize : 1;
+    const existing = storageItems.find(s => s.item === item && !s.modded);
+    if (existing) {
+        const totalQty = existing.qty + 1;
+        existing.buyPrice = (existing.buyPrice * existing.qty + buyPrice) / totalQty;
+        existing.qty = totalQty;
+    } else {
+        storageItems.push({ item, qty: 1, buyPrice, modded: false, date: new Date().toISOString() });
+    }
     saveAll();
 }
 
 function addToStorage(item, qty, buyPrice, modded) {
-    if (!item || isNaN(qty) || isNaN(buyPrice)) return;
+    if (!item || isNaN(qty)) return;
+    if (!buyPrice || isNaN(buyPrice)) buyPrice = 0;
     storageItems.push({ item, qty, buyPrice, modded, date: new Date().toISOString() });
     saveAll();
 }
@@ -156,4 +169,4 @@ function getGlobalAccuracy() {
         correct += withActual.filter(p => (p.predicted > 0.5 && p.actual === 1) || (p.predicted <= 0.5 && p.actual === 0)).length;
     });
     return total > 0 ? Math.round((correct / total) * 100) : 0;
-                       }
+                                                                              }
