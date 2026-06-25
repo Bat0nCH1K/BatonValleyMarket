@@ -18,15 +18,17 @@
 
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
     <div class="sidebar" id="sidebar">
-        <button onclick="switchScreen('items');toggleSidebar()">📦 Предметы</button>
+        <button onclick="switchScreen('items');toggleSidebar()">📦 Рынок</button>
+        <button onclick="switchScreen('storage');toggleSidebar()">🏭 Склад</button>
         <button onclick="switchScreen('trades');toggleSidebar()">💰 Сделки</button>
         <button onclick="switchScreen('events');toggleSidebar()">📅 События</button>
-        <button onclick="switchScreen('market');toggleSidebar()">📊 Рынок</button>
+        <button onclick="switchScreen('goals');toggleSidebar()">🎯 Цели</button>
+        <button onclick="switchScreen('market');toggleSidebar()">📊 Обзор</button>
     </div>
 
-    <!-- Предметы -->
+    <!-- Рынок (предметы) -->
     <div class="screen active" id="screen-items">
-        <h2>📦 ПРЕДМЕТЫ</h2>
+        <h2>📦 РЫНОК</h2>
         <div class="row">
             <input type="text" id="newItemName" placeholder="Название">
             <select id="newItemType">
@@ -36,7 +38,26 @@
             <button class="accent" onclick="addItemForm()">➕</button>
         </div>
         <div id="itemsList"></div>
-        <div id="priceEntry" style="display:none;"></div>
+    </div>
+
+    <!-- Страница предмета -->
+    <div class="screen" id="screen-item-detail">
+        <button onclick="switchScreen('items')" style="margin-bottom:10px;">← Назад</button>
+        <h2 id="detailTitle"></h2>
+        <div id="detailContent"></div>
+    </div>
+
+    <!-- Склад -->
+    <div class="screen" id="screen-storage">
+        <h2>🏭 СКЛАД</h2>
+        <div class="row">
+            <select id="storageItemSelect"></select>
+            <input type="number" id="storageQty" placeholder="Кол-во" value="1" min="1">
+            <input type="number" id="storageBuyPrice" placeholder="Цена покупки" step="0.01">
+            <label style="font-size:0.7em;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="storageModded"> С модом</label>
+            <button class="accent" onclick="addToStorage()">➕</button>
+        </div>
+        <div id="storageList"></div>
     </div>
 
     <!-- Сделки -->
@@ -56,7 +77,8 @@
     <div class="screen" id="screen-events">
         <h2>📅 СОБЫТИЯ</h2>
         <div class="row">
-            <input type="date" id="eventDate">
+            <input type="date" id="eventStart" placeholder="Начало">
+            <input type="date" id="eventEnd" placeholder="Конец">
             <select id="eventType">
                 <option value="factory">🏭 Фабрика</option>
                 <option value="rating_end">⚔️ Рейтинг</option>
@@ -72,9 +94,21 @@
         <div id="eventsList"></div>
     </div>
 
-    <!-- Рынок -->
+    <!-- Цели -->
+    <div class="screen" id="screen-goals">
+        <h2>🎯 ЦЕЛИ</h2>
+        <div class="row">
+            <input type="text" id="goalText" placeholder="Описание цели">
+            <input type="number" id="goalTarget" placeholder="Цель (голды)" step="0.01">
+            <input type="number" id="goalCurrent" placeholder="Сейчас" step="0.01">
+            <button class="accent" onclick="addGoal()">➕</button>
+        </div>
+        <div id="goalsList"></div>
+    </div>
+
+    <!-- Обзор рынка -->
     <div class="screen" id="screen-market">
-        <h2>📊 РЫНОК</h2>
+        <h2>📊 ОБЗОР РЫНКА</h2>
         <div class="market-tabs">
             <button class="market-tab active" onclick="switchMarketTab('overview')">📈 Общий</button>
             <button class="market-tab" onclick="switchMarketTab('resources')">⛏️ Ресурсы</button>
