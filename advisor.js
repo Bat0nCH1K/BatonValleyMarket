@@ -1,36 +1,51 @@
-// Wasteland Market Terminal — advisor.js (советник OWL)
-let advisorHistory = [];
- 
-function getKey() { 
+// Wasteland Market Terminal — advisor.js v2
+let advisorHistory = JSON.parse(localStorage.getItem('wl_advisor_history') || '[]');
+
+function getKey() {
     return atob('c2stb3ItdjEtODM0OGE1YmYzOGRiMTYyZGNmZGQxNTRkYjExYmEwYTA2NGY2YmRiNDg5M2Y0ZjMwMDNlNzY3ZTcyOTkxNDY3Ng==');
 }
 
 function getMarketSummary() {
-    let s = 'ТЕРМИНАЛ WASTELAND MARKET — ПОЛНЫЙ ОТЧЁТ\n\n';
-    s += `💰 Баланс: ${balance.toFixed(0)} голды\n📦 Предметов на рынке: ${items.length}\n`;
+    let s = 'ТЕРМИНАЛ WASTELAND MARKET\n\n';
+    s += `Баланс: ${balance.toFixed(0)} голды | Предметов: ${items.length}\n`;
+    
     const withData = items.filter(i => (prices[i.name]||[]).length >= 3);
     if (withData.length > 0) {
-        s += '\n📊 ТРЕНДЫ:\n';
+        s += '\nТРЕНДЫ:\n';
         withData.forEach(i => {
             const p = getPrediction(i.name);
-            s += `${i.name} (×${i.lotSize}): ср.${p.avgBuy.toFixed(1)}/шт, ${p.slope>0.1?'↗':p.slope<-0.1?'↘':'→'} ${p.slope.toFixed(2)}/ч, vol:${p.volatility.toFixed(2)}, увер:${(p.confidence*100).toFixed(0)}%\n`;
+            s += `${i.name}: ср.${p.avgBuy.toFixed(1)}/шт, ${p.slope>0.1?'растёт':p.slope<-0.1?'падает':'стабилен'} (${p.slope.toFixed(2)}/ч)\n`;
         });
     }
+    
     if (storageItems.length > 0) {
-        s += '\n🏭 СКЛАД:\n';
-        let tv = 0, ti = 0;
+        s += '\nСКЛАД:\n';
+        let tv = 0;
         storageItems.forEach(st => {
             const data = prices[st.item] || [], price = data.length>0?data[data.length-1].sell:0;
             const item = items.find(i=>i.name===st.item), ls = item?item.lotSize:1;
-            const val = price*st.qty/ls; tv += val; ti += st.buyPrice*st.qty;
-            s += `${st.item} ×${st.qty} (куп:${st.buyPrice}, тек:${val.toFixed(0)})${st.modded?' [мод]':''}\n`;
+            const val = price * st.qty;
+            tv += val;
+            const inv = (st.buyPrice||0) * st.qty;
+            const prof = val - inv;
+            s += `${st.item} ×${st.qty}: вложено ${inv.toFixed(0)}, сейчас ${val.toFixed(0)} (${prof>=0?'+':''}${prof.toFixed(0)})${st.modded?' [МОД]':''}\n`;
         });
-        s += `Оценка: ${tv.toFixed(0)} (${ti>0?((tv-ti)/ti*100).toFixed(1):0}%)\n`;
-    } else s += '\n🏭 СКЛАД: пуст\n';
+        s += `Оценка склада: ${tv.toFixed(0)} голды\n`;
+    } else s += '\nСклад пуст\n';
+    
     const ae = getActiveEvent();
-    if (ae) s += `\n📅 Текущее событие: ${ae.type} (до ${ae.end})\n`;
-    if (goals.length > 0) { s += '\n🎯 ЦЕЛИ:\n'; goals.forEach(g => s += `${g.text}: ${g.current.toFixed(0)}/${g.target.toFixed(0)} (${(g.current/g.target*100).toFixed(0)}%)\n`); }
-    if (trades.length > 0) { const tp = trades.reduce((a,b)=>a+b.profit,0), wr = trades.filter(t=>t.profit>0).length/trades.length*100; s += `\n💰 Сделок: ${trades.length}, успех: ${wr.toFixed(0)}%, прибыль: ${tp.toFixed(0)}\n`; }
+    if (ae) s += `\nТекущее событие: ${ae.type} (до ${ae.end})\n`;
+    
+    if (goals.length > 0) {
+        s += '\nЦЕЛИ:\n';
+        goals.forEach(g => s += `${g.text}: ${g.current.toFixed(0)}/${g.target.toFixed(0)} (${(g.current/g.target*100).toFixed(0)}%)\n`);
+    }
+    
+    if (trades.length > 0) {
+        const tp = trades.reduce((a,b)=>a+b.profit,0);
+        s += `\nСделок: ${trades.length}, прибыль: ${tp.toFixed(0)}\n`;
+    }
+    
     return s;
 }
 
@@ -49,21 +64,11 @@ async function askAdvisor() {
     input.value = '';
     
     const summary = getMarketSummary();
-    const systemPrompt = `Ты — OWL, торговый советник в игре Crossout Mobile. Твой стиль: деловой, краткий, конкретный. Ты видишь полный отчёт о рынке игрока.
-
-ПРАВИЛА:
-- Отвечай 2-5 предложениями
-- Давай конкретные цифры и рекомендации
-- Учитывай события (фабрика, рейтинг, БП) и их влияние на цены
-- Если предмет с модом — напоминай что продажа невыгодна (нужно снять мод)
-- Если есть цель — предлагай план её достижения
-- Если тренд падает — говори что покупать
-- Если тренд растёт — говори что продавать
-- Не пиши "как ИИ" или "я думаю" — просто давай совет
-- Если данных мало — скажи об этом и предложи записывать цены чаще`;
+    const systemPrompt = `Ты — OWL, торговый советник в Crossout Mobile. Стиль: деловой, краткий (2-5 предложений). Видишь рынок, склад, цели, события. Даёшь конкретные советы с цифрами. Напоминаешь что моды мешают продаже. Для целей предлагаешь план. Не пишешь "как ИИ".`;
     
-    advisorHistory = advisorHistory.slice(-5);
+    advisorHistory = advisorHistory.slice(-10);
     advisorHistory.push({ role: 'user', content: msg });
+    localStorage.setItem('wl_advisor_history', JSON.stringify(advisorHistory));
     
     try {
         const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -84,18 +89,26 @@ async function askAdvisor() {
         const data = await resp.json();
         const reply = data?.choices?.[0]?.message?.content?.trim() || 'Нет ответа.';
         advisorHistory.push({ role: 'assistant', content: reply });
+        localStorage.setItem('wl_advisor_history', JSON.stringify(advisorHistory));
         loadingEl.remove();
         chat.innerHTML += `<p style="color:var(--accent);margin:4px 0;">🦉 ${reply}</p>`;
     } catch(e) {
         loadingEl.remove();
-        chat.innerHTML += `<p style="color:var(--danger);margin:4px 0;">❌ Ошибка связи. Попробуй позже.</p>`;
+        chat.innerHTML += `<p style="color:var(--danger);margin:4px 0;">❌ Ошибка связи</p>`;
     }
     chat.scrollTop = chat.scrollHeight;
 }
 
 function renderAdvisor() {
     const chat = document.getElementById('advisorChat');
-    if (chat && chat.children.length === 0) {
+    if (!chat) return;
+    if (advisorHistory.length === 0) {
         chat.innerHTML = '<p style="color:var(--accent);">🦉 Я вижу твой рынок, склад и цели. Спроси что делать.</p>';
+        return;
     }
+    chat.innerHTML = advisorHistory.map(m => {
+        if (m.role === 'user') return `<p style="color:#888;margin:4px 0;">👤 ${m.content}</p>`;
+        return `<p style="color:var(--accent);margin:4px 0;">🦉 ${m.content}</p>`;
+    }).join('');
+    chat.scrollTop = chat.scrollHeight;
 }
