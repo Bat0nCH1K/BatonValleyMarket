@@ -64,7 +64,10 @@
             <input type="number" id="tradeSellPrice" placeholder="Продажа" step="0.01">
             <button class="accent" onclick="submitTrade()">OK</button>
         </div>
-        <table id="tradesTable"><thead><tr><th>Предмет</th><th>Куплен</th><th>Продан</th><th>+/-</th><th>%</th><th></th></tr></thead><tbody></tbody></table>
+        <table id="tradesTable">
+            <thead><tr><th>Предмет</th><th>Куплен</th><th>Продан</th><th>+/-</th><th>%</th><th>Время</th><th></th></tr></thead>
+            <tbody></tbody>
+        </table>
         <div id="tradeStats"></div>
     </div>
 
@@ -88,9 +91,13 @@
     <div class="screen" id="screen-goals">
         <h2>🎯 ЦЕЛИ</h2>
         <div class="row">
-            <input type="text" id="goalText" placeholder="Описание цели">
-            <input type="number" id="goalTarget" placeholder="Цель (голды)" step="0.01">
-            <input type="number" id="goalCurrent" placeholder="Сейчас" step="0.01">
+            <select id="goalType">
+                <option value="save">💰 Накопить</option>
+                <option value="sell">📤 Продать</option>
+                <option value="buy">📥 Купить</option>
+            </select>
+            <input type="number" id="goalAmount" placeholder="Сумма (голды)" step="1" min="1">
+            <select id="goalItem" style="display:none;"><option value="">Предмет</option></select>
             <button class="accent" onclick="submitGoal()">➕</button>
         </div>
         <div id="goalsList"></div>
