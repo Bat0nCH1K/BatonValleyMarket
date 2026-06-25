@@ -1,6 +1,6 @@
 // Wasteland Market Terminal — advisor.js (советник OWL)
 let advisorHistory = [];
-
+ 
 function getKey() { 
     return atob('c2stb3ItdjEtODM0OGE1YmYzOGRiMTYyZGNmZGQxNTRkYjExYmEwYTA2NGY2YmRiNDg5M2Y0ZjMwMDNlNzY3ZTcyOTkxNDY3Ng==');
 }
