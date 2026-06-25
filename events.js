@@ -62,7 +62,7 @@ function changeMonth(delta) {
 }
 
 // === ЦЕЛИ ===
-function addGoal() {
+function submitGoal() {
     const text = document.getElementById('goalText').value.trim();
     const target = parseFloat(document.getElementById('goalTarget').value);
     const current = parseFloat(document.getElementById('goalCurrent').value) || 0;
