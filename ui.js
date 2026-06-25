@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — ui.js (интерфейс)
+// Wasteland Market Terminal — ui.js (графики + фикс предсказаний)
 let currentTab = 'items';
 let calendarYear, calendarMonth;
 
@@ -86,14 +86,48 @@ function renderItemAnalytics() {
     if (!selectedItem) return;
     const data = prices[selectedItem] || [];
     const container = document.getElementById('itemAnalytics');
-    if (data.length < 2) {
-        container.innerHTML = '<p style="color:#888;">Нужно минимум 2 записи.</p>';
+    if (data.length < 3) {
+        container.innerHTML = '<p style="color:#888;font-size:0.8em;">📊 Нужно минимум 3 записи для аналитики. Сейчас: ' + data.length + '</p>';
         return;
     }
     const pred = getPrediction(selectedItem);
     const itemInsights = insights.filter(i => i.item === selectedItem);
-    container.innerHTML = `<div class="prediction ${pred.class}">${pred.text}</div>
-        <div style="font-size:0.8em;color:#888;margin-top:4px;">
+    
+    // Мини-график
+    const buys = data.map(p => p.buy);
+    const sells = data.map(p => p.sell);
+    const allVals = buys.concat(sells);
+    const maxVal = Math.max(...allVals);
+    const minVal = Math.min(...allVals);
+    const range = maxVal - minVal || 1;
+    
+    let graphHTML = '<div style="height:40px;display:flex;align-items:flex-end;gap:2px;margin:8px 0;">';
+    data.forEach(p => {
+        const buyH = ((p.buy - minVal) / range) * 100;
+        const sellH = ((p.sell - minVal) / range) * 100;
+        graphHTML += `<div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+            <div style="height:${sellH}%;background:var(--profit);opacity:0.5;border-radius:1px;" title="Продажа: ${p.sell}"></div>
+            <div style="height:${buyH}%;background:var(--accent);border-radius:1px;" title="Покупка: ${p.buy}"></div>
+        </div>`;
+    });
+    graphHTML += '</div>';
+    
+    // Линейный график тренда
+    let lineGraph = '<svg width="100%" height="30" style="margin:4px 0;"><polyline points="';
+    data.forEach((p, i) => {
+        const x = (i / Math.max(data.length - 1, 1)) * 100;
+        const y = 28 - ((p.buy - minVal) / range) * 26;
+        lineGraph += `${x},${y} `;
+    });
+    lineGraph += `" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>`;
+    
+    container.innerHTML = `
+        <div style="font-size:0.7em;color:#888;">📈 Тренд цены покупки:</div>
+        ${lineGraph}
+        <div style="font-size:0.7em;color:#888;">📊 Объёмы (зелёный=продажа, оранж=покупка):</div>
+        ${graphHTML}
+        <div class="prediction ${pred.class}" style="font-size:0.85em;">${pred.text}</div>
+        <div style="font-size:0.7em;color:#888;margin-top:4px;">
             Точность: ${getModelAccuracy(selectedItem)}% | Уверенность: ${(pred.confidence*100).toFixed(0)}%
         </div>
         ${itemInsights.length > 0 ? `<div style="margin-top:8px;font-size:0.75em;color:var(--accent);">💡 Инсайтов: ${itemInsights.length}</div>` : ''}`;
@@ -163,11 +197,10 @@ function renderAnalytics() {
     }
     let allPrices = [];
     selectedItems.forEach(item => {
-        const data = prices[item] || [];
-        data.forEach(p => allPrices.push({ item, ...p }));
+        (prices[item] || []).forEach(p => allPrices.push({ item, ...p }));
     });
     if (allPrices.length === 0) {
-        container.innerHTML = '<p style="color:#888;">Нет данных.</p>';
+        container.innerHTML = '<p style="color:#888;">Нет данных для выбранных предметов.</p>';
         return;
     }
     allPrices.sort((a,b) => new Date(a.time) - new Date(b.time));
@@ -175,6 +208,7 @@ function renderAnalytics() {
     const minPrice = Math.min(...allPrices.map(p => p.buy));
     const range = maxPrice - minPrice || 1;
 
+    // Группировка по дням
     const days = {};
     allPrices.forEach(p => {
         const day = p.time.slice(0, 10);
@@ -183,20 +217,41 @@ function renderAnalytics() {
         days[day][p.item].push(p.buy);
     });
 
-    let graphHTML = '<div class="graph-bar">';
+    // Столбцы + линия
     const dayKeys = Object.keys(days).sort();
+    let barHTML = '<div style="display:flex;align-items:flex-end;gap:2px;height:60px;margin:8px 0;">';
     dayKeys.forEach(day => {
-        graphHTML += '<div style="display:flex;flex-direction:column;flex:1;gap:1px;align-items:center;">';
+        barHTML += '<div style="flex:1;display:flex;flex-direction:column;gap:1px;align-items:center;">';
         selectedItems.forEach(item => {
             const vals = (days[day] || {})[item] || [];
             const avg = vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : 0;
             const h = ((avg - minPrice) / range) * 100;
             const color = stringToColor(item);
-            graphHTML += `<div style="height:${h}%;width:60%;background:${color};border-radius:1px;" title="${item}: ${h.toFixed(0)}%"></div>`;
+            barHTML += `<div style="height:${h}%;width:60%;background:${color};border-radius:1px;" title="${item}: ${avg.toFixed(2)}"></div>`;
         });
-        graphHTML += '</div>';
+        barHTML += '</div>';
     });
-    graphHTML += '</div>';
+    barHTML += '</div>';
+
+    // SVG линия для первого предмета
+    let lineHTML = '';
+    if (selectedItems.length === 1) {
+        const item = selectedItems[0];
+        const data = prices[item] || [];
+        if (data.length >= 2) {
+            const buys = data.map(p => p.buy);
+            const maxB = Math.max(...buys);
+            const minB = Math.min(...buys);
+            const rng = maxB - minB || 1;
+            lineHTML = '<svg width="100%" height="40" style="margin:4px 0;"><polyline points="';
+            buys.forEach((b, i) => {
+                const x = (i / Math.max(buys.length - 1, 1)) * 100;
+                const y = 38 - ((b - minB) / rng) * 36;
+                lineHTML += `${x},${y} `;
+            });
+            lineHTML += `" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>`;
+        }
+    }
 
     let statsHTML = '<div class="stats-grid">';
     selectedItems.forEach(item => {
@@ -207,7 +262,7 @@ function renderAnalytics() {
         statsHTML += `<div class="stat-item"><div class="value">${avgBuy.toFixed(2)}</div><div class="label">${item} (ср.)</div></div>`;
     });
     statsHTML += '</div>';
-    container.innerHTML = graphHTML + statsHTML;
+    container.innerHTML = lineHTML + barHTML + statsHTML;
 }
 
 function stringToColor(str) {
