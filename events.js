@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — events.js v2 (события + цели)
+// Wasteland Market Terminal — events.js v3 (цели с типами + drag & drop)
 let calendarYear, calendarMonth;
 
 function submitEvent() {
@@ -62,15 +62,37 @@ function changeMonth(delta) {
 }
 
 // === ЦЕЛИ ===
+document.addEventListener('DOMContentLoaded', function() {
+    const typeEl = document.getElementById('goalType');
+    if (typeEl) {
+        typeEl.addEventListener('change', function() {
+            const itemSelect = document.getElementById('goalItem');
+            if (this.value === 'save') {
+                itemSelect.style.display = 'none';
+            } else {
+                itemSelect.style.display = '';
+                itemSelect.innerHTML = '<option value="">Выбери предмет</option>' + items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+            }
+        });
+    }
+});
+
 function submitGoal() {
-    const text = document.getElementById('goalText').value.trim();
-    const target = parseFloat(document.getElementById('goalTarget').value);
-    const current = parseFloat(document.getElementById('goalCurrent').value) || 0;
-    if (!text || isNaN(target)) { alert('Заполни описание и цель'); return; }
-    addGoal(text, target, current);
-    document.getElementById('goalText').value = '';
-    document.getElementById('goalTarget').value = '';
-    document.getElementById('goalCurrent').value = '';
+    const type = document.getElementById('goalType').value;
+    const amount = parseFloat(document.getElementById('goalAmount').value);
+    const item = document.getElementById('goalItem').value;
+    
+    if (isNaN(amount) || amount <= 0) { alert('Введи сумму'); return; }
+    if ((type === 'sell' || type === 'buy') && !item) { alert('Выбери предмет'); return; }
+    
+    let text;
+    if (type === 'save') text = '💰 Накопить ' + amount + ' голды';
+    else if (type === 'sell') text = '📤 Продать ' + item + ' за ' + amount;
+    else text = '📥 Купить ' + item + ' за ' + amount;
+    
+    addGoal(text, amount, 0);
+    document.getElementById('goalAmount').value = '';
+    document.getElementById('goalItem').value = '';
     renderGoals();
 }
 
@@ -78,24 +100,30 @@ function renderGoals() {
     const list = document.getElementById('goalsList');
     if (!list) return;
     if (goals.length === 0) { list.innerHTML = '<p style="color:#888;">Нет целей</p>'; return; }
-    // Сортировка: сначала невыполненные, по приоритету (чем ближе к цели, тем выше)
-    goals.sort((a, b) => {
-        const pctA = a.target > 0 ? a.current / a.target : 0;
-        const pctB = b.target > 0 ? b.current / b.target : 0;
-        if (pctA >= 1 && pctB < 1) return 1;
-        if (pctB >= 1 && pctA < 1) return -1;
-        return pctB - pctA;
-    });
+    
     list.innerHTML = goals.map((g, i) => {
-        const pct = Math.min(100, g.target > 0 ? (g.current / g.target) * 100 : 0);
-        const done = pct >= 100;
-        return `<div class="item-card" style="${done ? 'opacity:0.6;' : ''}">
+        const pct = Math.min(100, g.target > 0 ? (balance / g.target) * 100 : 0);
+        const done = balance >= g.target;
+        return `<div class="item-card" style="cursor:grab;" draggable="true" ondragstart="dragGoal(event,${i})" ondragover="event.preventDefault()" ondrop="dropGoal(event,${i})">
             <div class="name">${done ? '✅' : '🎯'} ${g.text}</div>
-            <div style="font-size:0.8em;">${g.current.toFixed(0)} / ${g.target.toFixed(0)} голды</div>
+            <div style="font-size:0.8em;">Баланс: ${balance.toFixed(0)} / ${g.target.toFixed(0)}</div>
             <div style="height:6px;background:#1a2a2a;border-radius:3px;margin-top:4px;">
                 <div style="height:100%;width:${pct}%;background:${done?'var(--profit)':'var(--accent)'};border-radius:3px;"></div>
             </div>
             <button class="delete-btn" onclick="goals.splice(${i},1);saveAll();renderGoals();">✕</button>
         </div>`;
     }).join('');
-            }
+}
+
+function dragGoal(e, index) {
+    e.dataTransfer.setData('text/plain', index);
+}
+
+function dropGoal(e, toIndex) {
+    e.preventDefault();
+    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    const item = goals.splice(fromIndex, 1)[0];
+    goals.splice(toIndex, 0, item);
+    saveAll();
+    renderGoals();
+}
