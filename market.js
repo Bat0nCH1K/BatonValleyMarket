@@ -1,15 +1,6 @@
-// Wasteland Market Terminal — market.js v8 (полный фикс)
+// Wasteland Market Terminal — market.js v9 (фикс склада, целей, советника)
 let currentScreen = 'items';
 let marketTab = 'overview';
-
-function log(msg) {
-    const el = document.getElementById('consoleLog');
-    if (!el) return;
-    el.classList.add('visible');
-    el.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
-    el.scrollTop = el.scrollHeight;
-    while (el.children.length > 50) el.removeChild(el.firstChild);
-}
 
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
@@ -21,7 +12,6 @@ function switchScreen(screen) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById('screen-' + screen);
     if (target) target.classList.add('active');
-    log('📱 ' + screen);
     if (screen === 'items') renderItems();
     if (screen === 'trades') renderTrades();
     if (screen === 'events') { if (typeof initCalendar === 'function') initCalendar(); if (typeof renderEvents === 'function') renderEvents(); }
@@ -67,9 +57,7 @@ function selectItem(name) {
         '<option value="workshop">🔧 Цех</option>',
         '<option value="bounty">🎯 Охота</option>'
     ];
-    if (activeEvent) eventOptions.forEach((opt, i) => {
-        if (opt.includes('value="' + activeEvent.type + '"')) eventOptions[i] = opt.replace('">', '" selected>');
-    });
+    if (activeEvent) eventOptions.forEach((opt, i) => { if (opt.includes('value="' + activeEvent.type + '"')) eventOptions[i] = opt.replace('">', '" selected>'); });
 
     document.getElementById('screen-item-detail').classList.add('active');
     document.getElementById('screen-items').classList.remove('active');
@@ -155,7 +143,7 @@ function renderItemGraph() {
         </div>`;
 }
 
-// === СКЛАД (ФИКС) ===
+// === СКЛАД ===
 function updateStorageSelect() {
     const s = document.getElementById('storageItemSelect');
     if (s) s.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
@@ -180,7 +168,6 @@ function addToStorageUI() {
     qtyEl.value = '1';
     modEl.checked = false;
     renderStorage();
-    log('✅ Склад: ' + item + ' ×' + qty);
 }
 
 function renderStorage() {
@@ -198,14 +185,16 @@ function renderStorage() {
         const price = data.length > 0 ? data[data.length - 1].sell : 0;
         const item = items.find(it => it.name === s.item);
         const ls = item ? item.lotSize : 1;
-        const val = price * s.qty / ls;
-        const inv = (s.buyPrice || 0) * s.qty;
+        // buyPrice уже за лот, current price за лот
+        const val = price; // цена продажи за лот
+        const inv = (s.buyPrice || 0); // цена покупки за лот
         const prof = val - inv;
-        tv += val; ti += inv;
-        return `<div class="item-card"><div class="name">${s.item} ×${s.qty} ${s.modded?'🔧':''}</div><div class="stats">Вложено: ${inv.toFixed(2)} | Сейчас: ${val.toFixed(2)} | <span style="color:${prof>=0?'var(--profit)':'var(--loss)'}">${prof>=0?'+':''}${prof.toFixed(2)}</span></div><button class="delete-btn" onclick="storageItems.splice(${i},1);saveAll();renderStorage();">✕</button></div>`;
+        tv += val * s.qty;
+        ti += inv * s.qty;
+        return `<div class="item-card"><div class="name">${s.item} ×${s.qty} ${s.modded?'🔧':''}</div><div class="stats">Вложено: ${(inv*s.qty).toFixed(0)} | Сейчас: ${(val*s.qty).toFixed(0)} | <span style="color:${prof>=0?'var(--profit)':'var(--loss)'}">${prof>=0?'+':''}${(prof*s.qty).toFixed(0)}</span></div><button class="delete-btn" onclick="storageItems.splice(${i},1);saveAll();renderStorage();">✕</button></div>`;
     }).join('');
     const tp = tv - ti;
-    if (totalEl) totalEl.innerHTML = `<div class="stat-row" style="margin-top:10px;"><div class="stat-box"><div class="val">${tv.toFixed(2)}</div><div class="lbl">Оценка склада</div></div><div class="stat-box"><div class="val" style="color:${tp>=0?'var(--profit)':'var(--loss)'}">${tp>=0?'+':''}${tp.toFixed(2)}</div><div class="lbl">Потенциал</div></div></div>`;
+    if (totalEl) totalEl.innerHTML = `<div class="stat-row" style="margin-top:10px;"><div class="stat-box"><div class="val">${tv.toFixed(0)}</div><div class="lbl">Оценка склада</div></div><div class="stat-box"><div class="val" style="color:${tp>=0?'var(--profit)':'var(--loss)'}">${tp>=0?'+':''}${tp.toFixed(0)}</div><div class="lbl">Потенциал</div></div></div>`;
 }
 
 // === СДЕЛКИ ===
@@ -223,9 +212,9 @@ function submitTrade() {
 function renderTrades() {
     const tbody = document.querySelector('#tradesTable tbody');
     if (!tbody) return;
-    tbody.innerHTML = trades.map((t, i) => `<tr><td>${t.item}</td><td>${t.buyPrice.toFixed(2)}</td><td>${t.sellPrice.toFixed(2)}</td><td style="color:${t.profit>=0?'var(--profit)':'var(--loss)'}">${t.profit.toFixed(2)}</td><td style="color:${t.profit>=0?'var(--profit)':'var(--loss)'}">${t.profitPct.toFixed(1)}%</td><td><button class="delete-btn" onclick="trades.splice(${i},1);saveAll();renderTrades();">✕</button></td></tr>`).join('');
-    const tp = trades.reduce((a,b)=>a+b.profit,0), wr = trades.length>0?(trades.filter(t=>t.profit>0).length/trades.length*100):0;
-    document.getElementById('tradeStats').innerHTML = `<div class="stat-row"><div class="stat-box"><div class="val" style="color:${tp>=0?'var(--profit)':'var(--loss)'}">${tp.toFixed(2)}</div><div class="lbl">Прибыль</div></div><div class="stat-box"><div class="val">${trades.length}</div><div class="lbl">Сделок</div></div></div>`;
+    tbody.innerHTML = trades.map((t, i) => `<tr><td>${t.item}</td><td>${t.buyPrice.toFixed(0)}</td><td>${t.sellPrice.toFixed(0)}</td><td style="color:${t.profit>=0?'var(--profit)':'var(--loss)'}">${t.profit.toFixed(0)}</td><td style="color:${t.profit>=0?'var(--profit)':'var(--loss)'}">${t.profitPct.toFixed(1)}%</td><td><button class="delete-btn" onclick="trades.splice(${i},1);saveAll();renderTrades();">✕</button></td></tr>`).join('');
+    const tp = trades.reduce((a,b)=>a+b.profit,0);
+    document.getElementById('tradeStats').innerHTML = `<div class="stat-row"><div class="stat-box"><div class="val" style="color:${tp>=0?'var(--profit)':'var(--loss)'}">${tp.toFixed(0)}</div><div class="lbl">Прибыль</div></div><div class="stat-box"><div class="val">${trades.length}</div><div class="lbl">Сделок</div></div></div>`;
 }
 
 // === ОБЗОР ===
@@ -251,4 +240,6 @@ document.getElementById('balanceInput').value = balance;
 renderItems();
 updateTradeSelect();
 updateStorageSelect();
-log('🚀 Готов');
+if (typeof renderEvents === 'function') renderEvents();
+if (typeof initCalendar === 'function') initCalendar();
+if (typeof renderGoals === 'function') renderGoals();
