@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — market.js v12 (фикс оценки склада: цена за лот / lotSize * qty)
+// Wasteland Market Terminal — market.js v13 (без потенциала, общее состояние)
 let currentScreen = 'items';
 let marketTab = 'overview';
 
@@ -184,7 +184,7 @@ function renderItemGraph() {
         </div>`;
 }
 
-// === СКЛАД (ФИКС ОЦЕНКИ: цена за лот / lotSize * qty) ===
+// === СКЛАД (v13: без потенциала, только оценка + общее состояние) ===
 function updateStorageSelect() {
     const s = document.getElementById('storageItemSelect');
     if (s) s.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
@@ -199,12 +199,11 @@ function addToStorageUI() {
     const qty = parseInt(qtyEl.value) || 1;
     const modded = modEl.checked;
     if (!item) { alert('Выбери предмет'); return; }
-    // Автоподстановка: цена покупки за штуку
     const data = prices[item] || [];
     const itemObj = items.find(i => i.name === item);
     const ls = itemObj ? itemObj.lotSize : 1;
     const lastPrice = data.length > 0 ? Number(data[data.length - 1].buy) : 0;
-    const buyPrice = lastPrice / ls; // Цена за штуку
+    const buyPrice = lastPrice / ls;
     storageItems.push({ item, qty, buyPrice, modded, date: new Date().toISOString() });
     saveAll();
     qtyEl.value = '1'; modEl.checked = false;
@@ -215,21 +214,23 @@ function renderStorage() {
     const list = document.getElementById('storageList'), totalEl = document.getElementById('storageTotal');
     if (!list) return;
     if (storageItems.length === 0) { list.innerHTML = '<p style="color:#888;">Склад пуст</p>'; if (totalEl) totalEl.innerHTML = ''; return; }
-    let tv = 0, ti = 0;
+    let tv = 0;
     list.innerHTML = storageItems.map((s, i) => {
         const data = prices[s.item] || [];
         const item = items.find(it => it.name === s.item);
         const ls = item ? item.lotSize : 1;
-        // ФИКС: цена за лот делим на размер лота, получаем цену за штуку
         const pricePerUnit = data.length > 0 ? data[data.length - 1].sell / ls : 0;
-        const val = pricePerUnit * s.qty;  // Оценка в голде за штуки
-        const inv = (s.buyPrice || 0) * s.qty;
-        const prof = val - inv;
-        tv += val; ti += inv;
-        return `<div class="item-card"><div class="name">${s.item} ×${s.qty} ${s.modded?'🔧':''}</div><div class="stats">Вложено: ${inv.toFixed(0)} | Сейчас: ${val.toFixed(0)} | <span style="color:${prof>=0?'var(--profit)':'var(--loss)'}">${prof>=0?'+':''}${prof.toFixed(0)}</span></div><button class="delete-btn" onclick="storageItems.splice(${i},1);saveAll();renderStorage();">✕</button></div>`;
+        const val = pricePerUnit * s.qty;
+        tv += val;
+        return `<div class="item-card"><div class="name">${s.item} ×${s.qty}</div><div class="stats">Оценка: ${val.toFixed(0)} голды</div><button class="delete-btn" onclick="storageItems.splice(${i},1);saveAll();renderStorage();">✕</button></div>`;
     }).join('');
-    const tp = tv - ti;
-    if (totalEl) totalEl.innerHTML = `<div class="stat-row" style="margin-top:10px;"><div class="stat-box"><div class="val">${tv.toFixed(0)}</div><div class="lbl">Оценка склада</div></div><div class="stat-box"><div class="val" style="color:${tp>=0?'var(--profit)':'var(--loss)'}">${tp>=0?'+':''}${tp.toFixed(0)}</div><div class="lbl">Потенциал</div></div></div>`;
+    const total = balance + tv;
+    if (totalEl) totalEl.innerHTML = `
+        <div class="stat-row" style="margin-top:10px;">
+            <div class="stat-box"><div class="val">${balance.toFixed(0)}</div><div class="lbl">💰 Баланс</div></div>
+            <div class="stat-box"><div class="val">${tv.toFixed(0)}</div><div class="lbl">📦 Склад</div></div>
+            <div class="stat-box"><div class="val" style="color:var(--accent)">${total.toFixed(0)}</div><div class="lbl">🏦 Общее</div></div>
+        </div>`;
 }
 
 // === СДЕЛКИ ===
