@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — core.js v5.3 (фикс addTrade: лот при торговле, lotSize по умолчанию)
+// Wasteland Market Terminal — core.js v5.3.1 (синтаксический фикс)
 const STORAGE_ITEMS = 'wl_items_v4';
 const STORAGE_PRICES = 'wl_prices_v4';
 const STORAGE_TRADES = 'wl_trades_v4';
@@ -21,7 +21,7 @@ let selectedItem = null;
 // Восстановление lotSize для старых данных
 items = items.map(i => ({ lotSize: 1, ...i }));
 
-// Восстановление поля item для старых целей (если его нет — оставляем пустым)
+// Восстановление поля item для старых целей
 goals = goals.map(g => ({ item: '', ...g }));
 
 function saveAll() {
@@ -76,7 +76,6 @@ function addTrade(item, buyPrice, sellPrice) {
     balance += profit;
     document.getElementById('balanceInput').value = balance.toFixed(2);
     
-    // При сделке добавляем предмет на склад (1 лот, а не 1 штука)
     const itemObj = items.find(i => i.name === item);
     const lotSize = itemObj ? itemObj.lotSize : 1;
     const existing = storageItems.find(s => s.item === item && !s.modded);
@@ -173,4 +172,4 @@ function getGlobalAccuracy() {
         correct += withActual.filter(p => (p.predicted > 0.5 && p.actual === 1) || (p.predicted <= 0.5 && p.actual === 0)).length;
     });
     return total > 0 ? Math.round((correct / total) * 100) : 0;
-                      }
+        }
