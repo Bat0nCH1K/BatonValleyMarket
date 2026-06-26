@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — core.js v5.2 (фикс оценки склада)
+// Wasteland Market Terminal — core.js v5.3 (фикс addTrade: лот при торговле, lotSize по умолчанию)
 const STORAGE_ITEMS = 'wl_items_v4';
 const STORAGE_PRICES = 'wl_prices_v4';
 const STORAGE_TRADES = 'wl_trades_v4';
@@ -18,7 +18,11 @@ let storageItems = JSON.parse(localStorage.getItem(STORAGE_STORAGE) || '[]');
 let goals = JSON.parse(localStorage.getItem(STORAGE_GOALS) || '[]');
 let selectedItem = null;
 
+// Восстановление lotSize для старых данных
 items = items.map(i => ({ lotSize: 1, ...i }));
+
+// Восстановление поля item для старых целей (если его нет — оставляем пустым)
+goals = goals.map(g => ({ item: '', ...g }));
 
 function saveAll() {
     localStorage.setItem(STORAGE_ITEMS, JSON.stringify(items));
@@ -72,15 +76,16 @@ function addTrade(item, buyPrice, sellPrice) {
     balance += profit;
     document.getElementById('balanceInput').value = balance.toFixed(2);
     
+    // При сделке добавляем предмет на склад (1 лот, а не 1 штука)
     const itemObj = items.find(i => i.name === item);
     const lotSize = itemObj ? itemObj.lotSize : 1;
     const existing = storageItems.find(s => s.item === item && !s.modded);
     if (existing) {
-        const totalQty = existing.qty + 1;
+        const totalQty = existing.qty + lotSize;
         existing.buyPrice = (existing.buyPrice * existing.qty + buyPrice) / totalQty;
         existing.qty = totalQty;
     } else {
-        storageItems.push({ item, qty: 1, buyPrice, modded: false, date: new Date().toISOString() });
+        storageItems.push({ item, qty: lotSize, buyPrice, modded: false, date: new Date().toISOString() });
     }
     saveAll();
 }
@@ -94,9 +99,9 @@ function addToStorage(item, qty, buyPrice, modded) {
 
 function removeFromStorage(index) { storageItems.splice(index, 1); saveAll(); }
 
-function addGoal(text, target, current) {
+function addGoal(text, target, current, goalItem) {
     if (!text || isNaN(target)) return;
-    goals.push({ text, target, current: current || 0, date: new Date().toISOString() });
+    goals.push({ text, target, current: current || 0, item: goalItem || '', date: new Date().toISOString() });
     saveAll();
 }
 
@@ -168,4 +173,4 @@ function getGlobalAccuracy() {
         correct += withActual.filter(p => (p.predicted > 0.5 && p.actual === 1) || (p.predicted <= 0.5 && p.actual === 0)).length;
     });
     return total > 0 ? Math.round((correct / total) * 100) : 0;
-}
+                      }
