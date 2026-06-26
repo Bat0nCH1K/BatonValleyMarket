@@ -1,4 +1,4 @@
-// Wasteland Market Terminal — market.js v11 (фикс склада + фильтры + обзор как статистика)
+// Wasteland Market Terminal — market.js v12 (фикс оценки склада: цена за лот / lotSize * qty)
 let currentScreen = 'items';
 let marketTab = 'overview';
 
@@ -184,7 +184,7 @@ function renderItemGraph() {
         </div>`;
 }
 
-// === СКЛАД ===
+// === СКЛАД (ФИКС ОЦЕНКИ: цена за лот / lotSize * qty) ===
 function updateStorageSelect() {
     const s = document.getElementById('storageItemSelect');
     if (s) s.innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
@@ -199,8 +199,12 @@ function addToStorageUI() {
     const qty = parseInt(qtyEl.value) || 1;
     const modded = modEl.checked;
     if (!item) { alert('Выбери предмет'); return; }
+    // Автоподстановка: цена покупки за штуку
     const data = prices[item] || [];
-    const buyPrice = data.length > 0 ? Number(data[data.length - 1].buy) : 0;
+    const itemObj = items.find(i => i.name === item);
+    const ls = itemObj ? itemObj.lotSize : 1;
+    const lastPrice = data.length > 0 ? Number(data[data.length - 1].buy) : 0;
+    const buyPrice = lastPrice / ls; // Цена за штуку
     storageItems.push({ item, qty, buyPrice, modded, date: new Date().toISOString() });
     saveAll();
     qtyEl.value = '1'; modEl.checked = false;
@@ -213,9 +217,12 @@ function renderStorage() {
     if (storageItems.length === 0) { list.innerHTML = '<p style="color:#888;">Склад пуст</p>'; if (totalEl) totalEl.innerHTML = ''; return; }
     let tv = 0, ti = 0;
     list.innerHTML = storageItems.map((s, i) => {
-        const data = prices[s.item] || [], price = data.length > 0 ? data[data.length - 1].sell : 0;
-        const item = items.find(it => it.name === s.item), ls = item ? item.lotSize : 1;
-        const val = price * s.qty;
+        const data = prices[s.item] || [];
+        const item = items.find(it => it.name === s.item);
+        const ls = item ? item.lotSize : 1;
+        // ФИКС: цена за лот делим на размер лота, получаем цену за штуку
+        const pricePerUnit = data.length > 0 ? data[data.length - 1].sell / ls : 0;
+        const val = pricePerUnit * s.qty;  // Оценка в голде за штуки
         const inv = (s.buyPrice || 0) * s.qty;
         const prof = val - inv;
         tv += val; ti += inv;
@@ -258,7 +265,6 @@ function renderMarket() {
     
     if (filtered.length === 0) { container.innerHTML = '<p style="color:#888;">Нет предметов</p>'; return; }
     
-    // Общая статистика
     let totalAvgBuy = 0, count = 0, trendingUp = 0, trendingDown = 0, stable = 0;
     filtered.forEach(item => {
         const data = prices[item.name] || [];
@@ -273,7 +279,6 @@ function renderMarket() {
     });
     const avgMarket = count > 0 ? totalAvgBuy / count : 0;
     
-    // График среднего рынка
     let allBuys = [];
     filtered.forEach(item => {
         (prices[item.name] || []).forEach(p => allBuys.push(p.buy / (items.find(i=>i.name===item.name)?.lotSize||1)));
@@ -307,7 +312,6 @@ function renderMarket() {
         <div style="font-size:0.65em;color:#888;text-align:center;">Общий тренд рынка (все цены)</div>`;
     }
     
-    // Детализация по предметам
     html += '<h3 style="margin-top:12px;">📋 Детализация</h3>';
     html += '<div class="row"><input type="text" id="marketSearch" placeholder="🔍 Фильтр..." oninput="renderMarket()"></div>';
     const search = document.getElementById('marketSearch')?.value?.toLowerCase() || '';
