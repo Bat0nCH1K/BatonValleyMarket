@@ -167,4 +167,4 @@ function renderAdvisor() {
         return `<p style="color:var(--accent);margin:4px 0;">🦉 ${m.content}</p>`;
     }).join('');
     chat.scrollTop = chat.scrollHeight;
-                                                    }х
+            }
