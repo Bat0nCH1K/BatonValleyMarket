@@ -1,62 +1,36 @@
-// Wasteland Market Terminal — advisor.js v5.3 (Llama 3.2, анализ спроса/предложения)
+// Wasteland Market Terminal — advisor.js v5.4 (owl-alpha, новые промпты, без эмодзи-ав)
 let advisorHistory = JSON.parse(localStorage.getItem('wl_advisor_history') || '[]');
-
-const USER_AVATAR = '👤';
-const ERROR_AVATAR = '❌';
-const LOADING_AVATAR = '⏳';
 
 function getKey() {
     return atob('c2stb3ItdjEtODM0OGE1YmYzOGRiMTYyZGNmZGQxNTRkYjExYmEwYTA2NGY2YmRiNDg5M2Y0ZjMwMDNlNzY3ZTcyOTkxNDY3Ng==');
-}
-
-function getOwlMood(reply) {
-    const lower = reply.toLowerCase();
-    if (lower.includes('прибыль') || lower.includes('заработал') || lower.includes('плюс') || lower.includes('выгодно') || lower.includes('✅')) return '🤑';
-    if (lower.includes('убыток') || lower.includes('минус') || lower.includes('потеря') || lower.includes('рискован') || lower.includes('⚠️')) return '😟';
-    if (lower.includes('обвал') || lower.includes('рухнул') || lower.includes('крах') || lower.includes('паника') || lower.includes('слив')) return '😔';
-    if (lower.includes('растёт') || lower.includes('взлетел') || lower.includes('вверх') || lower.includes('хайп') || lower.includes('дефицит')) return '📈';
-    if (lower.includes('покупай') || lower.includes('бери') || lower.includes('закуп') || lower.includes('вход') || lower.includes('спрос')) return '🛒';
-    if (lower.includes('продавай') || lower.includes('скидывай') || lower.includes('фиксируй') || lower.includes('выход') || lower.includes('избыток')) return '💰';
-    if (lower.includes('жди') || lower.includes('подожди') || lower.includes('пока') || lower.includes('стабильн') || lower.includes('держи')) return '🦉';
-    if (lower.includes('утро') || lower.includes('доброе') || lower.includes('привет') || lower.includes('здаров')) return '😃';
-    if (lower.includes('ошибк') || lower.includes('неверно') || lower.includes('извини') || lower.includes('прости') || lower.includes('виноват')) return '😅';
-    if (lower.includes('спасибо') || lower.includes('удачи') || lower.includes('молодец') || lower.includes('красав')) return '🤝';
-    if (lower.includes('мало данных') || lower.includes('не знаю') || lower.includes('не могу') || lower.includes('недостаточно')) return '🤷';
-    return '🦉';
 }
 
 function getSupplyDemandAnalysis() {
     if (trades.length === 0) return '';
     
     const now = Date.now();
-    const DAY = 86400000;
-    const WEEK = 7 * DAY;
+    const WEEK = 7 * 86400000;
     
     const recent = trades.filter(t => now - new Date(t.date).getTime() < WEEK);
     if (recent.length === 0) return '';
     
     const byItem = {};
     recent.forEach(t => {
-        if (!byItem[t.item]) byItem[t.item] = { buyCount: 0, sellCount: 0, buyQty: 0, sellQty: 0 };
-        if (t.type === 'buy') {
-            byItem[t.item].buyCount++;
-            byItem[t.item].buyQty += t.qty;
-        } else {
-            byItem[t.item].sellCount++;
-            byItem[t.item].sellQty += t.qty;
-        }
+        if (!byItem[t.item]) byItem[t.item] = { buyQty: 0, sellQty: 0 };
+        if (t.type === 'buy') byItem[t.item].buyQty += t.qty;
+        else byItem[t.item].sellQty += t.qty;
     });
     
     let analysis = '\nСпрос/предложение (7 дней):\n';
     let hasData = false;
     
     Object.entries(byItem).forEach(([item, stats]) => {
-        if (stats.buyCount + stats.sellCount >= 2) {
+        if (stats.buyQty + stats.sellQty >= 2) {
             hasData = true;
-            const buyQtyRatio = stats.buyQty / (stats.buyQty + stats.sellQty || 1);
+            const ratio = stats.buyQty / (stats.buyQty + stats.sellQty || 1);
             let pressure = '';
-            if (buyQtyRatio > 0.6) pressure = 'ДЕФИЦИТ — цена растёт';
-            else if (buyQtyRatio < 0.4) pressure = 'ИЗБЫТОК — цена падает';
+            if (ratio > 0.6) pressure = 'ДЕФИЦИТ — цена растёт';
+            else if (ratio < 0.4) pressure = 'ИЗБЫТОК — цена падает';
             else pressure = 'Баланс';
             analysis += `  ${item}: покупок ${stats.buyQty}шт / продаж ${stats.sellQty}шт → ${pressure}\n`;
         }
@@ -154,10 +128,12 @@ async function askAdvisor() {
     const msg = input.value.trim();
     if (!msg) return;
     
-    chat.innerHTML += `<div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">${USER_AVATAR}</span><span style="color:#ccc;">${msg}</span></div>`;
+    chat.innerHTML += `<p style="color:#888;margin:4px 0;">👤 ${msg}</p>`;
     
-    const loadingId = 'loading_' + Date.now();
-    chat.innerHTML += `<div id="${loadingId}" style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">${LOADING_AVATAR}</span><span style="color:#888;">Анализирую рынок...</span></div>`;
+    const loadingEl = document.createElement('p');
+    loadingEl.style.cssText = 'color:#888;margin:4px 0;';
+    loadingEl.textContent = '⏳ Анализирую...';
+    chat.appendChild(loadingEl);
     chat.scrollTop = chat.scrollHeight;
     input.value = '';
     
@@ -175,20 +151,11 @@ async function askAdvisor() {
 7. 95% игроков — паникёры. Продают на падении (избыток → цена вниз), покупают на росте (дефицит → цена вверх).
 8. Анализируй спрос/предложение из данных.
 9. Не говори "как ИИ". Ты — OWL.
-10. Поправляют — признай ошибку.
-11. В конце — ОДНА эмодзи по настроению.`;
+10. Поправляют — признай ошибку.`;
 
     advisorHistory = advisorHistory.slice(-8);
     advisorHistory.push({ role: 'user', content: msg });
     localStorage.setItem('wl_advisor_history', JSON.stringify(advisorHistory));
-    
-    const messages = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: summary }
-    ];
-    for (const h of advisorHistory) {
-        messages.push({ role: h.role, content: h.content });
-    }
     
     try {
         const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -200,39 +167,26 @@ async function askAdvisor() {
                 'X-Title': 'Wasteland Market'
             },
             body: JSON.stringify({
-                model: 'meta-llama/llama-3.2-3b-instruct:free',
-                messages: messages,
+                model: 'openrouter/owl-alpha',
+                messages: [
+                    { role: 'system', content: systemPrompt + '\n\n' + summary },
+                    ...advisorHistory
+                ],
                 temperature: 0.5,
-                max_tokens: 350,
-                stop: ['===', 'ДАННЫЕ ТЕРМИНАЛА']
+                max_tokens: 300
             })
         });
-        
         const data = await resp.json();
-        
-        if (data.error) {
-            throw new Error(data.error.message || 'Ошибка API');
-        }
-        
         const reply = data?.choices?.[0]?.message?.content?.trim() || 'Нет ответа.';
         
-        const loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-        
-        const moodEmoji = getOwlMood(reply);
-        
-        const formatted = reply
-            .replace(/\n\n/g, '<br><br>')
-            .replace(/\n/g, '<br>');
-        
-        advisorHistory.push({ role: 'assistant', content: reply, mood: moodEmoji });
+        loadingEl.remove();
+        advisorHistory.push({ role: 'assistant', content: reply });
         localStorage.setItem('wl_advisor_history', JSON.stringify(advisorHistory));
         
-        chat.innerHTML += `<div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">${moodEmoji}</span><span style="color:#d4a574;">${formatted}</span></div>`;
+        chat.innerHTML += `<p style="color:var(--accent);margin:4px 0;">🦉 ${reply}</p>`;
     } catch(e) {
-        const loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-        chat.innerHTML += `<div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">${ERROR_AVATAR}</span><span style="color:#c06060;">Ошибка: ${e.message}</span></div>`;
+        loadingEl.remove();
+        chat.innerHTML += `<p style="color:var(--danger);margin:4px 0;">❌ Ошибка связи</p>`;
     }
     chat.scrollTop = chat.scrollHeight;
 }
@@ -241,18 +195,12 @@ function renderAdvisor() {
     const chat = document.getElementById('advisorChat');
     if (!chat) return;
     if (advisorHistory.length === 0) {
-        chat.innerHTML = `<div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">🦉</span><span style="color:#d4a574;">Я вижу твой рынок, склад и цели. Спроси что делать — дам конкретный совет.</span></div>`;
+        chat.innerHTML = '<p style="color:var(--accent);">🦉 Я вижу твой рынок, склад и цели. Спроси что делать.</p>';
         return;
     }
     chat.innerHTML = advisorHistory.map(m => {
-        if (m.role === 'user') {
-            return `<div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">${USER_AVATAR}</span><span style="color:#ccc;">${m.content}</span></div>`;
-        }
-        const mood = m.mood || '🦉';
-        const text = (m.content || '')
-            .replace(/\n\n/g, '<br><br>')
-            .replace(/\n/g, '<br>');
-        return `<div style="display:flex;align-items:flex-start;gap:6px;margin:6px 0;"><span style="font-size:1.2em;">${mood}</span><span style="color:#d4a574;">${text}</span></div>`;
+        if (m.role === 'user') return `<p style="color:#888;margin:4px 0;">👤 ${m.content}</p>`;
+        return `<p style="color:var(--accent);margin:4px 0;">🦉 ${m.content}</p>`;
     }).join('');
     chat.scrollTop = chat.scrollHeight;
-        }
+}
